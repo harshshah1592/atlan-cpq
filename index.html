@@ -2050,25 +2050,32 @@ function updateAddonsList(){
     }
     state.addons[a.id]=ad;
     const prLabel=isUP?' <span class="prorate-badge">'+(pf*100).toFixed(0)+'% pro-rata</span>':'';
-    html+=`<div class="addon-row${ad.active?' active':''}" onclick="toggleAddon('${a.id}')">
-      <div class="addon-check"><svg width="9" height="9" viewBox="0 0 10 10" fill="none"><path d="M2 5L4.5 7.5L8 3" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-      <div style="flex:1"><div class="addon-name">${a.name}</div>
-        <div class="addon-desc">${a.desc}${a.id!=='ins'?(' · List:'+(a.listPct*100).toFixed(0)+'% / Target:'+(a.targetPct*100).toFixed(0)+'% of base'):''}${base>0?(' · Base:'+fmt(base)):''}${prLabel}</div>
-      </div>
-      <div class="addon-price">${ad.list>0?fmt(ad.list)+' list':isFree?'Free':'—'}</div>
-    </div>
-    ${a.hasOptions&&ad.active?('<div class="addon-options">'+a.options.map(function(opt){return '<button class="addon-opt-btn'+(ad.option===opt?' sel':'')+'" onclick="event.stopPropagation();setAddonOption(\''+a.id+'\',\''+opt+'\')">' +opt+'</button>';}).join('')+'</div>'):''}
-    ${ad.active&&ad.list>0?`<div style="margin-left:26px;margin-bottom:8px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;align-items:center">
-      <div style="font-size:10px;color:var(--muted)">List: <strong class="mono">${fmt(ad.list)}</strong></div>
-      <div><input type="number" value="${ad.net}" placeholder="Net price" onclick="event.stopPropagation()"
-        onchange="event.stopPropagation();updateAddon('${a.id}','net',this.value)" onblur="event.stopPropagation();updateAddon('${a.id}','net',this.value)"
-        style="width:100%;padding:4px 7px;border:1px solid var(--border);border-radius:var(--rs);font-size:11px"/></div>
-      <div style="display:flex;align-items:center;gap:3px">
-        <input type="number" min="0" max="100" step="0.5" value="${ad.disc.toFixed(1)}" onclick="event.stopPropagation()"
-          onchange="event.stopPropagation();updateAddon('${a.id}','disc',this.value)" onblur="event.stopPropagation();updateAddon('${a.id}','disc',this.value)"
-          style="width:55px;padding:4px 7px;border:1px solid var(--border);border-radius:var(--rs);font-size:11px"/>
-        <span style="font-size:10px;color:var(--faint)">%</span></div>
-    </div>`:''}`;
+    var addonRowHtml = '<div class="addon-row'+(ad.active?' active':'')+'" onclick="toggleAddon(\'' + a.id + '\')">'
+      + '<div class="addon-check"><svg width="9" height="9" viewBox="0 0 10 10" fill="none"><path d="M2 5L4.5 7.5L8 3" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>'
+      + '<div style="flex:1"><div class="addon-name">' + a.name + '</div>'
+      + '<div class="addon-desc">' + a.desc + (a.id!=='ins' ? (' · List:' + (a.listPct*100).toFixed(0) + '% / Target:' + (a.targetPct*100).toFixed(0) + '% of base') : '') + (base>0 ? (' · Base:' + fmt(base)) : '') + prLabel + '</div>'
+      + '</div>'
+      + '<div class="addon-price">' + (ad.list>0 ? fmt(ad.list)+' list' : isFree ? 'Free' : '—') + '</div>'
+      + '</div>';
+    if(a.hasOptions && ad.active) {
+      addonRowHtml += '<div class="addon-options">' + a.options.map(function(opt){
+        return '<button class="addon-opt-btn' + (ad.option===opt?' sel':'') + '" onclick="event.stopPropagation();setAddonOption(\'' + a.id + '\',\'' + opt + '\')">' + opt + '</button>';
+      }).join('') + '</div>';
+    }
+    if(ad.active && ad.list>0) {
+      addonRowHtml += '<div style="margin-left:26px;margin-bottom:8px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;align-items:center">'
+        + '<div style="font-size:10px;color:var(--muted)">List: <strong class="mono">' + fmt(ad.list) + '</strong></div>'
+        + '<div><input type="number" value="' + ad.net + '" placeholder="Net price" onclick="event.stopPropagation()"'
+        + ' onchange="event.stopPropagation();updateAddon(\'' + a.id + '\',\'net\',this.value)" onblur="event.stopPropagation();updateAddon(\'' + a.id + '\',\'net\',this.value)"'
+        + ' style="width:100%;padding:4px 7px;border:1px solid var(--border);border-radius:var(--rs);font-size:11px"/></div>'
+        + '<div style="display:flex;align-items:center;gap:3px">'
+        + '<input type="number" min="0" max="100" step="0.5" value="' + ad.disc.toFixed(1) + '" onclick="event.stopPropagation()"'
+        + ' onchange="event.stopPropagation();updateAddon(\'' + a.id + '\',\'disc\',this.value)" onblur="event.stopPropagation();updateAddon(\'' + a.id + '\',\'disc\',this.value)"'
+        + ' style="width:55px;padding:4px 7px;border:1px solid var(--border);border-radius:var(--rs);font-size:11px"/>'
+        + '<span style="font-size:10px;color:var(--faint)">%</span></div>'
+        + '</div>';
+    }
+    html += addonRowHtml;
   });
   // ── Custom Products appended below standard add-ons ──
   const cpList = loadCustomProducts();

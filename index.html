@@ -448,6 +448,9 @@ textarea{resize:vertical;min-height:60px}
   <div class="sb-item" onclick="openDealTypeModal()" id="nav-new-deal">
     <span class="sb-item-icon"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" stroke="currentColor" stroke-width="1.5"/><path d="M7 4v6M4 7h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span>New Deal
   </div>
+  <div class="sb-item" onclick="showView('quotes')" id="nav-quotes">
+    <span class="sb-item-icon"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="1" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.4"/><path d="M4 4.5h6M4 7h6M4 9.5h3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg></span>Quotes
+  </div>
   <div class="sb-section">Config</div>
   <div class="sb-item" onclick="showView('approval-matrix')" id="nav-approval-matrix">
     <span class="sb-item-icon"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 4h10M2 7h7M2 10h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="11" cy="9.5" r="2.5" stroke="currentColor" stroke-width="1.3"/><path d="M10 9.5l.8.8 1.2-1.3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Approval Matrix
@@ -455,6 +458,9 @@ textarea{resize:vertical;min-height:60px}
   <div class="sb-item" onclick="showView('pricing-admin')" id="nav-pricing-admin">
     <span class="sb-item-icon"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1.5" y="1.5" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.4"/><path d="M4.5 7h5M7 4.5v5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span>Pricing Config
     <span style="margin-left:auto;font-size:8px;padding:1px 5px;border-radius:4px;background:rgba(49,84,196,.3);color:#6B8FFF;font-weight:700">ADMIN</span>
+  </div>
+  <div class="sb-item" onclick="showView('contracts')" id="nav-contracts">
+    <span class="sb-item-icon"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="2" width="12" height="10" rx="1.5" stroke="currentColor" stroke-width="1.4"/><path d="M4 5h6M4 7h4M4 9h5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg></span>Contracts
   </div>
   <!-- Role Switcher (demo only) -->
   <div style="padding:10px 12px;border-top:1px solid rgba(255,255,255,.06)">
@@ -489,36 +495,55 @@ textarea{resize:vertical;min-height:60px}
 
   <!-- DEAL TYPE MODAL -->
   <div id="dealTypeModal" class="hidden">
-    <div class="modal-box">
-      <div class="modal-title">Create New Deal</div>
-      <div class="modal-sub">Select the Salesforce Opportunity record type</div>
+    <div class="modal-box" style="max-width:520px">
+      <div class="modal-title">New Quote</div>
+      <div class="modal-sub">Creates a Quote linked to a Salesforce Opportunity</div>
+
+      <!-- SFDC Opp ID -->
+      <div style="margin-bottom:14px;padding:12px 14px;background:#F8FAFC;border:1px solid var(--border);border-radius:8px">
+        <label class="lbl" style="margin-bottom:6px;display:block">Salesforce Opportunity ID <span class="req">*</span></label>
+        <input type="text" id="f_sfdcOppId" placeholder="e.g. 006Hs00000AbCdEfG" 
+          style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:var(--mono)"
+          oninput="validateSfdcOpp()"/>
+        <div id="sfdcOppHint" class="hint" style="margin-top:4px">Paste the 18-character SFDC Opportunity ID — the quote will be linked to this opp</div>
+      </div>
+
+      <!-- Deal type cards -->
       <div class="deal-type-cards">
         <div class="dt-card sel" id="dtNB" onclick="selectDealType('NB')">
           <div class="dt-card-icon">🆕</div>
           <div class="dt-card-name">New Business</div>
-          <div class="dt-card-desc">Net new logo or expansion</div>
+          <div class="dt-card-desc">Net new logo — creates a new contract on acceptance</div>
         </div>
         <div class="dt-card" id="dtUP" onclick="selectDealType('UP')">
           <div class="dt-card-icon">📈</div>
-          <div class="dt-card-name">Upsell</div>
-          <div class="dt-card-desc">Add-ons to existing contract — co-termed &amp; pro-rated</div>
+          <div class="dt-card-name">Amendment</div>
+          <div class="dt-card-desc">Add SKUs to an existing contract — co-termed &amp; pro-rated</div>
         </div>
         <div class="dt-card" id="dtRN" onclick="selectDealType('RN')">
           <div class="dt-card-icon">🔄</div>
           <div class="dt-card-name">Renewal</div>
-          <div class="dt-card-desc">Renew existing contract, same or new terms</div>
+          <div class="dt-card-desc">Renew an existing contract for a new term</div>
         </div>
       </div>
+
+      <!-- Contract reference for UP/RN — populated from active contracts -->
       <div id="nbRefRow" class="nb-ref-field hidden">
-        <label class="lbl">Reference NB Deal ID (existing deal to link)</label>
+        <label class="lbl">Parent Contract <span class="req">*</span></label>
         <select id="f_nbRefDeal" style="margin-top:4px">
-          <option value="">— Select existing NB deal —</option>
+          <option value="">— Select active contract —</option>
         </select>
-        <div class="hint" style="margin-top:4px">Fields will auto-populate from the selected deal</div>
+        <div id="contractRefHint" class="hint" style="margin-top:4px">Account details and live SKUs will be pre-filled from this contract</div>
       </div>
+
+      <!-- NB duplicate warning -->
+      <div id="nbDuplicateWarn" class="hidden" style="margin-top:10px;padding:10px 14px;background:#FEF3C7;border:1px solid #FCD34D;border-radius:8px;font-size:12px;color:#92400E">
+        ⚠ <strong>Active contract already exists</strong> for this customer. A new NB quote can only be created if the existing contract has expired or been cancelled.
+      </div>
+
       <div class="modal-actions">
         <button class="btn-secondary" onclick="closeDealTypeModal()">Cancel</button>
-        <button class="btn-primary" onclick="startDeal()">Start Deal →</button>
+        <button class="btn-primary" id="btnStartDeal" onclick="startDeal()">Create Quote →</button>
       </div>
     </div>
   </div>
@@ -565,6 +590,11 @@ textarea{resize:vertical;min-height:60px}
       <div class="dash-card">
         <div class="dash-card-title">Approval Queue</div>
         <div id="approvalQueue"></div>
+      </div>
+    </div>
+    <div style="padding:0 28px 16px">
+      <div class="dash-card" id="dashRenewalAlerts" style="display:none;background:#FFFBEB;border:1px solid #FDE68A">
+        <!-- filled by renderDashboard -->
       </div>
     </div>
     <div style="padding:0 28px 28px">
@@ -664,6 +694,84 @@ textarea{resize:vertical;min-height:60px}
     <div style="padding:20px 28px;display:flex;flex-direction:column;gap:20px" id="pricingAdminBody">
       <!-- sections rendered by JS -->
     </div>
+  </div>
+
+  <!-- ── QUOTES VIEW ──────────────────────────────────── -->
+  <div class="view" id="view-quotes">
+    <div class="dash-hero" style="background:linear-gradient(135deg,#1a237e 0%,#283593 60%,#1a237e 100%);min-height:auto;padding:20px 28px">
+      <div class="dash-hero-bg"></div>
+      <div style="position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+        <div>
+          <div style="font-size:20px;font-weight:700;color:#fff">Quotes</div>
+          <div style="font-size:12px;color:rgba(255,255,255,.5);margin-top:3px">All quotes linked to SFDC Opportunities · Accept a quote to create a Contract</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <div style="display:flex;gap:6px">
+            <button onclick="setQuoteFilter('all')" id="qfAll" class="contract-filter-btn active">All</button>
+            <button onclick="setQuoteFilter('Draft')" id="qfDraft" class="contract-filter-btn">📝 Draft</button>
+            <button onclick="setQuoteFilter('Pending Approval')" id="qfPending" class="contract-filter-btn">⏳ Pending</button>
+            <button onclick="setQuoteFilter('Approved')" id="qfApproved" class="contract-filter-btn">✅ Approved</button>
+            <button onclick="setQuoteFilter('Accepted')" id="qfAccepted" class="contract-filter-btn">🤝 Accepted</button>
+            <button onclick="setQuoteFilter('Rejected')" id="qfRejected" class="contract-filter-btn">❌ Rejected</button>
+          </div>
+          <input type="text" id="quoteSearch" placeholder="Search..." oninput="renderQuotes()"
+            style="padding:7px 12px;border:1px solid rgba(255,255,255,.15);border-radius:8px;font-size:12px;width:160px;background:rgba(255,255,255,.08);color:#fff"/>
+        </div>
+      </div>
+      <div id="quoteKpis" style="position:relative;z-index:1;display:flex;gap:16px;margin-top:16px;flex-wrap:wrap"></div>
+    </div>
+    <div style="padding:20px 28px">
+      <div id="quotesList"></div>
+    </div>
+  </div>
+
+  <!-- ── CONTRACTS VIEW ──────────────────────────────── -->
+  <div class="view" id="view-contracts">
+    <!-- Hero banner -->
+    <div class="dash-hero" style="background:linear-gradient(135deg,#0B1829 0%,#0C2340 60%,#0B1829 100%);min-height:auto;padding:20px 28px">
+      <div class="dash-hero-bg"></div>
+      <div style="position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+        <div>
+          <div style="font-size:20px;font-weight:700;color:#fff">Customer Contracts</div>
+          <div style="font-size:12px;color:rgba(255,255,255,.5);margin-top:3px">Live SKU ledger · Source of truth for amendments &amp; renewals</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <div style="display:flex;gap:6px">
+            <button onclick="setContractFilter('all')" id="cfAll" class="contract-filter-btn active">All</button>
+            <button onclick="setContractFilter('contracted')" id="cfContracted" class="contract-filter-btn">🔒 Contracted</button>
+            <button onclick="setContractFilter('renewing')" id="cfRenewing" class="contract-filter-btn">⏰ Renewing Soon</button>
+            <button onclick="setContractFilter('draft')" id="cfDraft" class="contract-filter-btn">📝 Draft</button>
+          </div>
+          <input type="text" id="contractSearch" placeholder="Search company..." oninput="renderContracts()"
+            style="padding:7px 12px;border:1px solid rgba(255,255,255,.15);border-radius:8px;font-size:12px;width:180px;background:rgba(255,255,255,.08);color:#fff"/>
+        </div>
+      </div>
+      <!-- KPI strip -->
+      <div id="contractKpis" style="position:relative;z-index:1;display:flex;gap:16px;margin-top:16px;flex-wrap:wrap"></div>
+    </div>
+
+    <div style="padding:20px 28px">
+      <div id="contractsList"></div>
+    </div>
+
+    <!-- Full-page Contract Detail Panel -->
+    <div id="contractDetail" class="hidden" style="position:fixed;top:0;right:0;width:680px;height:100vh;background:#fff;border-left:1px solid var(--border);overflow-y:auto;z-index:300;box-shadow:-8px 0 32px rgba(0,0,0,.12)">
+      <!-- Sticky header -->
+      <div style="padding:18px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:#fff;z-index:10">
+        <div>
+          <div style="font-size:16px;font-weight:700;color:var(--text)" id="cdCompanyName">—</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px" id="cdDealMeta">—</div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button onclick="openDealTypeModal(el('contractDetail').dataset.dealId)" style="padding:6px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:none;background:#3154C4;color:#fff">📈 New Amendment</button>
+        <button onclick="openDealTypeModal(el('contractDetail').dataset.dealId,'RN')" style="padding:6px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:none;background:#6B4FA8;color:#fff">🔄 Renew</button>
+          <button onclick="closeContractDetail()" style="background:none;border:1px solid var(--border);border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer;color:var(--muted)">✕</button>
+        </div>
+      </div>
+      <div id="cdBody" style="padding:20px 24px"></div>
+    </div>
+    <!-- Overlay backdrop -->
+    <div id="contractDetailBackdrop" class="hidden" onclick="closeContractDetail()" style="position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:299"></div>
   </div>
 
 </div><!-- /content -->
@@ -1724,7 +1832,13 @@ function freshState(){
     renewalType:'auto',renewalDays:30,uplift:7,ambassador:true,optOut:false,optOutDays:'',
     mktTerms:'',notes:'',apprComments:'',
     discReason:'',nonStdTerms:'',
-    createdAt:new Date().toISOString(),status:'Draft',
+    createdAt:new Date().toISOString(),
+    quoteStatus:'Draft',
+    sfdcOppId:'',
+    parentContractId:'',
+    quoteAcceptedAt:null,
+    contractId:'',
+    status:'Draft',
   };
 }
 let state = freshState();
@@ -1771,7 +1885,9 @@ function showView(name){
   const titles={dashboard:['Pricing Dashboard','Real-time deal economics — March 2026'],
     cpq:['New Deal — '+dealTypeLabel(state.dealType),'Atlan CPQ · FY25'],
     'approval-matrix':['Approval Matrix','Edit discount thresholds — changes apply immediately'],
-    'pricing-admin':['Pricing Configuration','Admin only · Edit master pricing · Changes apply to all new quotes']};
+    'pricing-admin':['Pricing Configuration','Admin only · Edit master pricing · Changes apply to all new quotes'],
+    'contracts':['Customer Contracts','Live SKU ledger — active subscriptions per customer'],
+    'quotes':['Quotes','All quotes linked to SFDC Opportunities — accept to create a Contract']};
   const t=titles[name]||['',''];
   el('topbarTitle').textContent=t[0]; el('topbarSub').textContent=t[1];
   if(name==='dashboard') renderDashboard();
@@ -1784,43 +1900,119 @@ function showView(name){
     if(!canAccess('canViewPricingAdmin')){ showAccessDenied('Pricing Configuration'); showView('dashboard'); return; }
     showPricingAdmin();
   }
+  if(name==='contracts'){ renderContracts(); }
+  if(name==='quotes'){ renderQuotes(); }
 }
 
 // ═══════════════════════════════════════════════════════════════════
 // DEAL TYPE MODAL
 // ═══════════════════════════════════════════════════════════════════
-function openDealTypeModal(){
+function openDealTypeModal(preContractId, preDealType){
   try{
-    // populate NB ref list (include all NB deals, not just Approved)
-    const nbDeals=deals.filter(d=>d.dealType==='NB');
-    const sel=el('f_nbRefDeal');
+    var oppEl = el('f_sfdcOppId');
+    if(oppEl) oppEl.value = '';
+    var hintEl = el('sfdcOppHint');
+    if(hintEl){ hintEl.textContent='Paste the 18-character SFDC Opportunity ID'; hintEl.style.color=''; }
+    el('nbDuplicateWarn').classList.add('hidden');
+    // Populate contract selector — only Active contracts
+    var activeContracts = loadContracts().filter(function(c){ return c.status==='Active'; });
+    var sel = el('f_nbRefDeal');
     if(!sel){ console.error('f_nbRefDeal not found'); return; }
-    sel.innerHTML='<option value="">— Select existing NB deal —</option>';
-    nbDeals.forEach(d=>sel.innerHTML+=`<option value="${d.dealId}">${d.dealId} — ${d.legal||'(no name)'}</option>`);
+    sel.innerHTML = '<option value="">— Select active contract —</option>';
+    activeContracts.forEach(function(c){
+      sel.innerHTML += '<option value="'+c.contractId+'">'
+        +c.contractId+' — '+escHtml(c.legal||'(no name)')+' ('+escHtml(c.platformTier||'—')+')</option>';
+    });
+    if(preContractId){ sel.value = preContractId; selectDealType(preDealType||'UP'); }
+    else { selectDealType('NB'); }
     el('dealTypeModal').classList.remove('hidden');
   }catch(e){ console.error('openDealTypeModal error:',e); }
 }
 function closeDealTypeModal(){ el('dealTypeModal').classList.add('hidden'); }
+
+function validateSfdcOpp(){
+  var val = (el('f_sfdcOppId')?.value||'').trim();
+  var hint = el('sfdcOppHint');
+  if(!hint) return;
+  if(!val){ hint.textContent='Paste the 18-character SFDC Opportunity ID'; hint.style.color=''; return; }
+  if(val.length < 15){ hint.textContent='Too short — SFDC IDs are 15–18 characters'; hint.style.color='#D63B3B'; return; }
+  var existing = deals.find(function(d){ return d.sfdcOppId && d.sfdcOppId===val; });
+  if(existing){ hint.textContent='Quote already exists for Opp '+val+' ('+existing.dealId+')'; hint.style.color='#D63B3B'; }
+  else { hint.textContent='Opp ID valid — no existing quote found'; hint.style.color='#00B87A'; }
+}
+
 function selectDealType(dt){
   dealType=dt;
-  ['NB','UP','RN'].forEach(t=>el('dt'+t)?.classList.toggle('sel',t===dt));
-  el('nbRefRow').classList.toggle('hidden',dt==='NB');
+  ['NB','UP','RN'].forEach(function(t){ el('dt'+t)?.classList.toggle('sel',t===dt); });
+  el('nbRefRow').classList.toggle('hidden', dt==='NB');
+  el('nbDuplicateWarn').classList.add('hidden');
 }
+
 function startDeal(){
   try{
-    state=freshState();
-    state.dealType=dealType;
-    nbRefDealId=null;
-    if(dealType!=='NB'){
-      nbRefDealId=el('f_nbRefDeal')?.value||null;
-      if(nbRefDealId){ prefillFromNBDeal(nbRefDealId); }
+    var sfdcOpp = (el('f_sfdcOppId')?.value||'').trim();
+    if(!sfdcOpp){ alert('Please enter a Salesforce Opportunity ID to create a quote.'); return; }
+    if(dealType !== 'NB'){
+      var contractRef = el('f_nbRefDeal')?.value||'';
+      if(!contractRef){ alert('Please select the parent contract for this '+dealTypeLabel(dealType)+'.'); return; }
+    }
+    state = freshState();
+    state.dealType = dealType;
+    state.sfdcOppId = sfdcOpp;
+    state.dealId = 'Q-'+Math.floor(1000+Math.random()*9000);
+    state.quoteStatus = 'Draft';
+    nbRefDealId = null;
+    if(dealType !== 'NB'){
+      var cid = el('f_nbRefDeal')?.value||null;
+      state.parentContractId = cid;
+      nbRefDealId = cid;
+      if(cid){ prefillFromContract(cid); }
     }
     closeDealTypeModal();
     step=0;
     renderCPQ();
     showView('cpq');
-  }catch(e){ console.error('startDeal error:',e); alert('Error starting deal: '+e.message); }
+  }catch(e){ console.error('startDeal error:',e); alert('Error creating quote: '+e.message); }
 }
+
+function prefillFromContract(contractId){
+  var contracts = loadContracts();
+  var contract = contracts.find(function(c){ return c.contractId===contractId; });
+  if(!contract){
+    var nb = deals.find(function(d){ return d.dealId===contractId || d.contractId===contractId; });
+    if(nb){ prefillFromNBDeal(nb.dealId); return; }
+    return;
+  }
+  state.legal=contract.legal; state.billing=contract.billing;
+  state.contact=contract.contact; state.email=contract.email;
+  state.payTerms=contract.payTerms; state.billFreq=contract.billFreq;
+  state.entity=contract.entity; state.currency=contract.currency;
+  state.poRequired=contract.poRequired; state.poNum=contract.poNum;
+  state.platformTier=contract.platformTier;
+  state.assets=contract.assets;
+  state.nbPlatformTier=contract.platformTier;
+  state.nbAssets=contract.assets;
+  state.nbPlatformNet=contract.platformNet;
+  state.nbPlatformList=contract.platformList;
+  if(dealType==='UP'){
+    var start=new Date(contract.startDate);
+    var termMo=parseInt(contract.termMonths)||12;
+    var end=new Date(start); end.setMonth(end.getMonth()+termMo);
+    var now=new Date();
+    state.termMonths=Math.max(1,Math.round((end-now)/(30.44*24*3600*1000)));
+    state.startDate=now.toISOString().slice(0,10);
+    state.nbEndDate=end.toISOString().slice(0,10);
+    state.upMode='add_assets';
+  } else if(dealType==='RN'){
+    var cs=new Date(contract.startDate);
+    var ct=parseInt(contract.termMonths)||12;
+    var ce=new Date(cs); ce.setMonth(ce.getMonth()+ct); ce.setDate(ce.getDate()+1);
+    state.startDate=ce.toISOString().slice(0,10);
+    state.termMonths=contract.termMonths||12;
+    state.renewalFromContractId=contractId;
+  }
+}
+
 function prefillFromNBDeal(nbId){
   const nb=deals.find(d=>d.dealId===nbId);
   if(!nb) return;
@@ -1841,6 +2033,14 @@ function prefillFromNBDeal(nbId){
     state.termMonths=moRemaining;
     state.startDate=now.toISOString().slice(0,10);
     state.nbEndDate=end.toISOString().slice(0,10);
+    // Auto-fill platform from NB deal
+    state.platformTier=nb.platformTier||null;
+    state.nbPlatformTier=nb.platformTier||null;  // remember NB tier for credit calc
+    state.nbAssets=nb.assets||0;                  // remember NB asset count
+    state.assets=nb.assets||0;                    // default to same, rep can increase
+    state.nbPlatformNet=nb.platformNet||0;         // NB net platform price for credit
+    state.nbPlatformList=nb.platformList||0;
+    state.upMode='add_assets';                     // default: adding assets (no tier change)
   } else if(dealType==='RN'){
     // Start = day after NB end
     const start=new Date(nb.startDate);
@@ -1892,11 +2092,43 @@ function calcPlatformPrice(){
   el('f_platNet').value=state.platformNet;
   el('f_platDisc').value=discPct(list,state.platformNet).toFixed(1);
   el('platformListDisplay').textContent=fmt(list);
-  el('assetCalcResult').textContent=`List: ${fmt(list)} · Target: ${fmt(target)} · Current: ${fmt(state.platformNet)}`;
+  // ── Upsell tier-change credit ──
+  var upCreditHtml = '';
+  if(state.dealType==='UP' && state.nbPlatformNet>0) {
+    const pf = getProrateFactor();
+    const tierChanged = tier !== state.nbPlatformTier;
+    if(tierChanged) {
+      // Credit = prorated NB platform net
+      const credit = Math.round(state.nbPlatformNet * pf);
+      state.upTierCredit = credit;
+      upCreditHtml = '<div style="margin-top:8px;padding:8px 12px;background:#FEF3C7;border:1px solid #FCD34D;border-radius:var(--rs);font-size:11px">'
+        + '<span style="font-weight:700;color:#92400E">⚠ Tier Change: NB platform credit applied</span>'
+        + '<br><span style="color:#78350F">Prorated NB net (' + (pf*100).toFixed(0) + '% of ' + fmt(state.nbPlatformNet) + '): <strong style="color:#D97706">−' + fmt(credit) + '</strong> will be credited against new platform price</span>'
+        + '</div>';
+    } else {
+      state.upTierCredit = 0;
+      // Asset add: charge incremental only
+      const nbPrice = calcPlatformPriceForTier(tier, state.nbAssets||0);
+      const incrementalList = Math.max(0, list - nbPrice.list);
+      const incrementalTarget = Math.max(0, target - nbPrice.target);
+      upCreditHtml = '<div style="margin-top:8px;padding:8px 12px;background:#ECFDF5;border:1px solid #6EE7B7;border-radius:var(--rs);font-size:11px">'
+        + '<span style="font-weight:700;color:#065F46">✓ Same tier — incremental asset pricing</span>'
+        + '<br><span style="color:#047857">NB base: ' + fmt(nbPrice.list) + ' · Incremental list: <strong>' + fmt(incrementalList) + '</strong> · Incremental target: <strong>' + fmt(incrementalTarget) + '</strong></span>'
+        + '</div>';
+      // Set platform net to incremental target by default for UP same-tier
+      if(!state.platformNet || state.platformNet===target) {
+        state.platformNet = Math.max(0, Math.round(incrementalTarget * pf));
+        if(el('f_platNet')) el('f_platNet').value = state.platformNet;
+        if(el('f_platDisc')) el('f_platDisc').value = discPct(list, state.platformNet).toFixed(1);
+      }
+    }
+  }
+  el('assetCalcResult').textContent = 'List: ' + fmt(list) + ' · Target: ' + fmt(target) + ' · Current: ' + fmt(state.platformNet);
   el('platformPriceBreakdown')?.classList.remove('hidden');
-  let html=`<div style="font-size:10px;font-weight:700;color:var(--muted);margin-bottom:6px">Price Breakdown — ${tier}</div>`;
-  breakdown.forEach(b=>{html+=`<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid var(--border);font-size:11px"><span style="color:var(--muted)">${b.label}</span><span style="font-family:var(--mono)">${fmt(b.listAmt)} list / ${fmt(b.targetAmt)} target</span></div>`;});
-  html+=`<div style="display:flex;justify-content:space-between;padding:4px 0;font-weight:700;font-size:12px"><span>Total Platform</span><span style="font-family:var(--mono)">${fmt(list)} list / ${fmt(target)} target</span></div>`;
+  var html = '<div style="font-size:10px;font-weight:700;color:var(--muted);margin-bottom:6px">Price Breakdown — ' + tier + '</div>';
+  breakdown.forEach(function(b){ html += '<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid var(--border);font-size:11px"><span style="color:var(--muted)">'+b.label+'</span><span style="font-family:var(--mono)">'+fmt(b.listAmt)+' list / '+fmt(b.targetAmt)+' target</span></div>'; });
+  html += '<div style="display:flex;justify-content:space-between;padding:4px 0;font-weight:700;font-size:12px"><span>Total Platform</span><span style="font-family:var(--mono)">'+fmt(list)+' list / '+fmt(target)+' target</span></div>';
+  html += upCreditHtml;
   el('platformPriceBreakdown').innerHTML=html;
   updateRampRows();updateAddonsList();updateSummaryStats();
 }
@@ -2025,6 +2257,31 @@ function updateUser(i,field,val){
 // ADDONS
 // ═══════════════════════════════════════════════════════════════════
 function getAddonBase(){return(state.platformList||0)+state.users.reduce((s,u)=>s+u.annualList,0);}
+// ── Early definitions needed by updateAddonsList ──
+const CP_KEY = 'atlan_custom_products';
+function loadCustomProducts() {
+  try { return JSON.parse(localStorage.getItem(CP_KEY)||'[]'); } catch(e) { return []; }
+}
+function saveCustomProducts(arr) {
+  try { localStorage.setItem(CP_KEY, JSON.stringify(arr)); } catch(e) {}
+}
+const CP_CATEGORIES = {
+  addon:     { label:'Add-On',            icon:'🧩', color:'#6B4FA8', bg:'rgba(107,79,168,.1)' },
+  platform:  { label:'Platform Ext.',     icon:'🏗',  color:'#3154C4', bg:'rgba(49,84,196,.1)' },
+  service:   { label:'Prof. Service',     icon:'🛠',  color:'#E89B00', bg:'rgba(232,155,0,.1)' },
+  connector: { label:'Connector',         icon:'🔌', color:'#009DB5', bg:'rgba(0,157,181,.1)' },
+  other:     { label:'Other',             icon:'📦', color:'#8896AA', bg:'rgba(136,150,170,.1)' },
+};
+const CP_TYPES = {
+  flat:     'Flat Rate',
+  pct:      '% of Base',
+  dynamic:  'Dynamic Bands',
+  per_unit: 'Per Unit',
+};
+function escHtml(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
 function updateAddonsList(){
   const base=getAddonBase();
   const pf=getProrateFactor(); const isUP=state.dealType==='UP';
@@ -2122,6 +2379,9 @@ function updateAddonsList(){
       }
     });
   }
+  // Write to DOM
+  const addonsListEl = el('addonsList');
+  if(addonsListEl) addonsListEl.innerHTML = html;
 } // end updateAddonsList
 
 function cpCalcList(cp, base, pf) {
@@ -2325,6 +2585,10 @@ function getAllLineItems(){
   if(c.qty>0)items.push({name:`Custom Connectors (×${c.qty})`,cat:'Connectors',list:c.qty*(CONNECTOR_PRICES[state.platformTier||'Enterprise']||2000),net:c.net||0});
   (state.services||[]).forEach((s,i)=>{if(s.active&&s.list>0)items.push({name:(SERVICES[i]?.name||'Services')+' ('+getSvcDealType()+')',cat:'Services',list:s.list,net:s.net||s.list});});
   (state.customSkus||[]).forEach(s=>{if(s.list>0)items.push({name:s.name||'Custom SKU',cat:'Custom',list:s.list,net:s.net||s.list});});
+  // Upsell tier-change credit (negative line item)
+  if(state.dealType==='UP' && state.upTierCredit>0) {
+    items.push({name:'NB Platform Credit (tier change, prorated)', cat:'Credit', list:-state.upTierCredit, net:-state.upTierCredit});
+  }
   return items;
 }
 function getTotals(){
@@ -2493,16 +2757,16 @@ function renderApprovalStep(){
         </div>
         ${isChecked?('<span style="font-size:10px;padding:2px 8px;border-radius:4px;background:'+opt.color+'22;color:'+opt.color+';font-weight:600;flex-shrink:0;white-space:nowrap">Req: '+opt.approver+'</span>'):''}
       </div>
-      ${isChecked?`<div style="padding:9px 11px;border-top:1px solid ${opt.color}33;background:#fff;display:flex;align-items:center;gap:8px">
-        <div style="font-size:11px;color:var(--muted);flex:1">Approver: <strong>${opt.approver}</strong></div>
-        <input class="appr-email" placeholder="Approver email" value="${ap.email||''}" oninput="setApproval('nst_${opt.key}','email',this.value)" style="width:170px"/>
-        <div class="appr-btns">
-          <button class="btn-appr btn-ok" onclick="setApproval('nst_${opt.key}','status','approved')">Approve</button>
-          <button class="btn-appr btn-rej" onclick="setApproval('nst_${opt.key}','status','rejected')">Reject</button>
-          <button class="btn-appr btn-pend" onclick="setApproval('nst_${opt.key}','status','pending')">Pending</button>
-        </div>
-        ${ap.status?badge(ap.status,ap.status==='approved'?'#16A34A':ap.status==='rejected'?'#D63B3B':'#B45309'):''}
-      </div>`:''}
+      ${isChecked?('<div style="padding:9px 11px;border-top:1px solid '+opt.color+'33;background:#fff;display:flex;align-items:center;gap:8px">'
+        +'<div style="font-size:11px;color:var(--muted);flex:1">Approver: <strong>'+opt.approver+'</strong></div>'
+        +'<input class="appr-email" placeholder="Approver email" value="'+(ap.email||'')+'" oninput="setApproval(\'nst_'+opt.key+'\',\'email\',this.value)" style="width:170px"/>'
+        +'<div class="appr-btns">'
+        +'<button class="btn-appr btn-ok" onclick="setApproval(\'nst_'+opt.key+'\',\'status\',\'approved\')">Approve</button>'
+        +'<button class="btn-appr btn-rej" onclick="setApproval(\'nst_'+opt.key+'\',\'status\',\'rejected\')">Reject</button>'
+        +'<button class="btn-appr btn-pend" onclick="setApproval(\'nst_'+opt.key+'\',\'status\',\'pending\')">Pending</button>'
+        +'</div>'
+        +(ap.status?badge(ap.status,ap.status==='approved'?'#16A34A':ap.status==='rejected'?'#D63B3B':'#B45309'):'')
+        +'</div>'):''}
     </div>`;
   });
   nstHtml+='</div>';
@@ -2712,7 +2976,63 @@ function renderOrderForm(){
 function printOF(){
   const content=el('ofDoc').innerHTML;
   const w=window.open('','_blank');
-  w.document.write(`<!DOCTYPE html><html><head><title>Atlan Order Form — ${state.legal||'Draft'}</title><style>body{margin:15mm;font-family:Arial,sans-serif;font-size:11px;color:#000}table{border-collapse:collapse;width:100%}@page{margin:12mm}</style></head><body>${content}</body></html>`);
+  w.document.write(`<!DOCTYPE html><html><head><title>Atlan Order Form — ${state.legal||'Draft'}</title><style>body{margin:15mm;font-family:Arial,sans-serif;font-size:11px;color:#000}table{border-collapse:collapse;width:100%}@page{margin:12mm}
+/* ── CONTRACT CARDS ───────────────────────────────────── */
+.contract-card {
+  background:#fff;
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:16px 20px;
+  margin-bottom:12px;
+  cursor:pointer;
+  transition:box-shadow .15s, border-color .15s, transform .1s;
+  position:relative;
+}
+.contract-card:hover {
+  box-shadow:0 6px 20px rgba(0,0,0,.09);
+  border-color:#C7D2FE;
+  transform:translateY(-1px);
+}
+.contract-card.contracted {
+  border-left:4px solid #00B87A;
+}
+.contract-card.renewing-soon {
+  border-left:4px solid #E89B00;
+}
+.contract-stat-lbl { font-size:10px;color:var(--faint);font-weight:600;letter-spacing:.4px;text-transform:uppercase;margin-bottom:3px; }
+.contract-stat-val { font-size:13px;font-weight:700;color:var(--text); }
+.contract-filter-btn {
+  padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;
+  border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:rgba(255,255,255,.7);
+  transition:all .15s;
+}
+.contract-filter-btn:hover { background:rgba(255,255,255,.15); }
+.contract-filter-btn.active { background:rgba(255,255,255,.2);color:#fff;border-color:rgba(255,255,255,.4); }
+.contract-kpi {
+  padding:10px 16px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);
+  border-radius:10px;min-width:120px;
+}
+.contract-kpi-lbl { font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:rgba(255,255,255,.4);margin-bottom:4px; }
+.contract-kpi-val { font-size:18px;font-weight:700;color:#fff; }
+.contract-kpi-sub { font-size:10px;color:rgba(255,255,255,.4);margin-top:2px; }
+.sku-row {
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 12px;background:#F8FAFC;border:1px solid var(--border);
+  border-radius:8px;margin-bottom:6px;
+}
+.sku-row:hover { background:#F1F5F9; }
+.amendment-pill {
+  display:inline-flex;align-items:center;gap:5px;
+  padding:3px 10px;border-radius:12px;font-size:10px;font-weight:700;
+  cursor:pointer;transition:opacity .15s;
+}
+.amendment-pill:hover { opacity:.8; }
+.renewal-alert {
+  padding:10px 14px;background:#FFF8E1;border:1px solid #FFE082;
+  border-radius:8px;font-size:11px;color:#B45309;
+  display:flex;align-items:center;gap:8px;margin-bottom:12px;
+}
+</style></head><body>${content}</body></html>`);
   w.document.close();w.focus();setTimeout(()=>w.print(),400);
 }
 function exportJSON(){
@@ -2733,8 +3053,20 @@ function saveDeal(){
     entity:v('f_entity')||state.entity,currency:v('f_currency')||state.currency,
     totalList,totalNet,disc,
     repName:v('f_repName')||state.repName||'Rep',
+    quoteStatus:state.quoteStatus||'Draft',
+    sfdcOppId:v('f_sfdcOpId')||state.sfdcOppId||'',
+    parentContractId:state.parentContractId||'',
+    contractId:state.contractId||'',
     status:disc<=15?'Approved':'Pending Approval',
-    submittedAt:new Date().toISOString()
+    submittedAt:new Date().toISOString(),
+    endDate:(function(){
+      var sd=v('f_startDate')||state.startDate;
+      var tm=parseInt(v('f_termMonths')||state.termMonths)||12;
+      if(!sd) return '';
+      var d=new Date(sd); d.setMonth(d.getMonth()+tm); return d.toISOString().slice(0,10);
+    })(),
+    contracted: state.contracted||false,
+    contractedAt: state.contractedAt||null,
   };
   const idx=deals.findIndex(d=>d.dealId===snap.dealId);
   if(idx>=0) deals[idx]=snap; else deals.unshift(snap);
@@ -2769,6 +3101,7 @@ function renderDashboard(){
     {lbl:'Price Realization',val:pct(priceReal),sub:'vs list price',cls:priceReal<75?'neg':'pos',icon:'📈',iconBg:'rgba(49,84,196,.1)',iconColor:'#3154C4'},
     {lbl:'Pending Approvals',val:String(pendingAppr),sub:approvedCount+' approved',cls:pendingAppr>0?'warn':'pos',icon:'⏳',iconBg:pendingAppr>0?'rgba(232,155,0,.1)':'rgba(0,184,122,.1)',iconColor:pendingAppr>0?'#E89B00':'#00B87A'},
     {lbl:'Pipeline by Type',val:'NB·UP·RN',sub:fmt(nbNet,'USD')+' · '+fmt(upNet,'USD')+' · '+fmt(rnNet,'USD'),cls:'',icon:'🗂',iconBg:'rgba(107,79,168,.1)',iconColor:'#6B4FA8'},
+    {lbl:'Contracted ARR',val:fmt(activeDeals.filter(function(d){return d.contracted;}).reduce(function(s,d){return s+(d.totalNet||0);},0)),sub:activeDeals.filter(function(d){return d.contracted;}).length+' contracts locked',cls:'pos',icon:'🔒',iconBg:'rgba(0,184,122,.1)',iconColor:'#00B87A'},
   ];
   if(el('dashKpis')) el('dashKpis').innerHTML=kpiData.map(k=>`<div class="kpi">
     <div class="kpi-icon" style="background:${k.iconBg};color:${k.iconColor}">${k.icon}</div>
@@ -2821,6 +3154,29 @@ function renderDashboard(){
       <span class="badge" style="background:${tier.color}22;color:${tier.color};border:1px solid ${tier.color}55">● ${tier.approver}</span>
     </div>`;
   }).join(''):'<div style="color:var(--faint);font-size:12px;padding:10px 0">No pending approvals.</div>';
+
+  // ── Renewal alerts ──
+  var renewalAlerts = getRenewalAlerts();
+  var renewalEl = el('dashRenewalAlerts');
+  if(renewalEl) {
+    if(renewalAlerts.length) {
+      renewalEl.style.display = '';
+      renewalEl.innerHTML = '<div style="font-size:13px;font-weight:700;margin-bottom:10px;color:var(--text)">⏰ Contracts Renewing Soon</div>'
+        + renewalAlerts.map(function(d) {
+            var days = daysUntil(dealEndDate(d));
+            var urgency = days <= 30 ? '#D63B3B' : '#E89B00';
+            return '<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:#fff;border:1px solid '+urgency+'33;border-radius:8px;margin-bottom:6px;cursor:pointer" onclick="showView(\'contracts\');setTimeout(function(){openContractDetail(\''+d.dealId+'\')},100)">'
+              +'<div>'
+              +  '<div style="font-size:12px;font-weight:700">'+escHtml(d.legal||d.dealId)+'</div>'
+              +  '<div style="font-size:10px;color:var(--faint)">'+d.dealId+' · '+fmt(d.totalNet||0)+' ARR</div>'
+              +'</div>'
+              +'<span style="padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;background:'+urgency+'22;color:'+urgency+';border:1px solid '+urgency+'44">'+days+'d left</span>'
+              +'</div>';
+          }).join('');
+    } else {
+      renewalEl.style.display = 'none';
+    }
+  }
 
   // Apply role filter
   const visibleDeals = filterDealsForRole(deals);
@@ -2973,7 +3329,10 @@ function buildPane0(){
       <strong>${dtl} Deal</strong>
       ${state.dealType==='UP'?'<span style="font-size:11px;font-weight:400">Fields locked from original deal · Pro-rated pricing applied automatically</span>':''}
       ${state.dealType==='RN'?'<span style="font-size:11px;font-weight:400">Modifiable fields · Contract start date auto-set to day after original deal end</span>':''}
-      <span style="margin-left:auto;font-size:11px;font-weight:700;font-family:var(--mono)">${state.dealId}</span>
+      <div style="margin-left:auto;text-align:right">
+        <div style="font-size:11px;font-weight:700;font-family:var(--mono)">${state.dealId}</div>
+        ${state.sfdcOppId?('<div style="font-size:9px;color:'+dtc+'99;margin-top:2px">SFDC: '+escHtml(state.sfdcOppId)+'</div>'):''}
+      </div>
     </div>
     <div class="card">
       <div class="card-title"><div class="step-chip">1</div>
@@ -3065,15 +3424,26 @@ function buildPane0(){
 }
 
 function buildPane1(){
+  const isUP = state.dealType==='UP';
+  const upBanner = isUP ? (
+    '<div style="margin-bottom:12px;padding:10px 14px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:var(--rs);font-size:11px">'
+    +'<div style="font-weight:700;color:#1D4ED8;margin-bottom:4px">📈 Upsell — Platform from Original Deal</div>'
+    +'<div style="color:#1E40AF">Original tier: <strong>'+(state.nbPlatformTier||'—')+'</strong> · Original assets: <strong>'+(state.nbAssets?state.nbAssets.toLocaleString():'—')+'</strong>'
+    +(state.nbPlatformNet?' · NB net price: <strong>$'+state.nbPlatformNet.toLocaleString()+'</strong>':'')+'</div>'
+    +'<div style="margin-top:6px;color:#1E40AF">You can <strong>add more assets</strong> below. To change platform tier, select a new tier — the prorated NB amount will be credited automatically.</div>'
+    +'</div>'
+  ) : '';
   el('pane1').innerHTML=`
     <div class="card">
       <div class="card-title"><div class="step-chip">2</div>
-        <div><div class="card-title-text">Platform Edition</div><div class="card-title-sub">Select tier and enter asset volume</div></div>
+        <div><div class="card-title-text">Platform Edition</div><div class="card-title-sub">${isUP?'Adding assets or changing tier from original deal':'Select tier and enter asset volume'}</div></div>
       </div>
+      ${upBanner}
       <div class="platform-grid" id="tierCards"></div>
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;padding:10px 12px;background:#F8FAFC;border-radius:var(--rs);border:1px solid var(--border)">
-        <label style="font-size:11px;font-weight:600;color:var(--muted);white-space:nowrap">Catalogued Assets:</label>
+        <label style="font-size:11px;font-weight:600;color:var(--muted);white-space:nowrap">${isUP?'New Total Assets:':'Catalogued Assets:'}</label>
         <input type="number" id="f_assets" min="0" placeholder="1,000,000" value="${state.assets||''}" onchange="calcPlatformPrice()" onblur="calcPlatformPrice()" style="width:140px"/>
+        ${isUP&&state.nbAssets?('<span style="font-size:10px;color:var(--muted)">NB had '+state.nbAssets.toLocaleString()+' assets</span>'):''}
         <div class="mono" id="assetCalcResult" style="font-size:11px;color:var(--muted);flex:1;text-align:right">Select tier and enter asset volume</div>
       </div>
       <div id="platformPriceBreakdown" class="hidden" style="background:#F8FAFC;border:1px solid var(--border);border-radius:var(--rs);padding:12px;font-size:11px"></div>
@@ -3140,14 +3510,14 @@ function buildPane4(){
       </div>
       <div id="connectorRows"></div>
     </div>
-    ${showCustomSku?`<div class="card">
-      <div class="card-title"><div class="step-chip" style="background:var(--amber)">5b</div>
-        <div><div class="card-title-text">Legacy / Custom Subscription SKUs</div>
-          <div class="card-title-sub">For Renewal/Upsell deals with non-standard legacy line items</div></div>
-        <button class="btn-secondary" onclick="addCustomSku()" style="margin-left:auto;font-size:11px;padding:5px 12px">+ Add SKU</button>
-      </div>
-      <div id="customSkuRows"></div>
-    </div>`:''}
+    ${showCustomSku?('<div class="card">'
+      +'<div class="card-title"><div class="step-chip" style="background:var(--amber)">5b</div>'
+      +'<div><div class="card-title-text">Legacy / Custom Subscription SKUs</div>'
+      +'<div class="card-title-sub">For Renewal/Upsell deals with non-standard legacy line items</div></div>'
+      +'<button class="btn-secondary" onclick="addCustomSku()" style="margin-left:auto;font-size:11px;padding:5px 12px">+ Add SKU</button>'
+      +'</div>'
+      +'<div id="customSkuRows"></div>'
+      +'</div>'):''}
     <div class="card">
       <div class="card-title"><div class="step-chip">5c</div>
         <div><div class="card-title-text">Professional & Implementation Services</div></div>
@@ -3195,7 +3565,7 @@ function buildPane6(){
         <label class="lbl">Discount Reason</label>
         <select id="f_discReason">
           <option value="">— Select —</option>
-          ${['Competitive pressure','Budget constraints','Strategic account / Expansion deal','Executive relationship','Multi-year incentive','Other'].map(function(r){ return '<option'+(r===state.discReason?' selected':'')+'>'+(r)+'</option>`'; }).join('')}
+          ${['Competitive pressure','Budget constraints','Strategic account / Expansion deal','Executive relationship','Multi-year incentive','Other'].map(function(r){ return '<option'+(r===state.discReason?' selected':'')+'>'+(r)+'</option>'; }).join('')}
         </select>
       </div>
       <div class="field" style="margin-top:8px">
@@ -3215,6 +3585,12 @@ function buildPane7(){
         <button class="btn-primary" onclick="printOF()">🖨 Print / Export PDF</button>
         <button class="btn-secondary" onclick="exportJSON()">↓ Export JSON (SFDC)</button>
         <button class="btn-secondary" onclick="saveDeal();renderDashboard()">💾 Save Deal</button>
+        <button id="btnAcceptQuote" onclick="acceptQuote()" style="padding:7px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:none;background:#6B4FA8;color:#fff">
+          🤝 Accept Quote
+        </button>
+        <button id="btnCreateContract" onclick="createContractFromQuote()" class="hidden" style="padding:7px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:none;background:#00B87A;color:#fff">
+          🔒 Create Contract
+        </button>
       </div>
     </div>
     <div class="of-doc" id="ofDoc"></div>`;
@@ -3315,30 +3691,9 @@ function toggleOptOut(){ const checked=el('f_optOut')?.checked;el('optOutDaysFie
 // CUSTOM PRODUCTS — Admin-managed product catalog
 // Stored in localStorage: 'atlan_custom_products'
 // ═══════════════════════════════════════════════════════════════════
-const CP_KEY = 'atlan_custom_products';
-
-function loadCustomProducts() {
-  try { return JSON.parse(localStorage.getItem(CP_KEY)||'[]'); } catch(e) { return []; }
-}
-function saveCustomProducts(arr) {
-  try { localStorage.setItem(CP_KEY, JSON.stringify(arr)); } catch(e) {}
-}
 
 // ── Category meta ────────────────────────────────────────────────────
-const CP_CATEGORIES = {
-  addon:     { label:'Add-On',            icon:'🧩', color:'#6B4FA8', bg:'rgba(107,79,168,.1)' },
-  platform:  { label:'Platform Ext.',     icon:'🏗',  color:'#3154C4', bg:'rgba(49,84,196,.1)' },
-  service:   { label:'Prof. Service',     icon:'🛠',  color:'#E89B00', bg:'rgba(232,155,0,.1)' },
-  connector: { label:'Connector',         icon:'🔌', color:'#009DB5', bg:'rgba(0,157,181,.1)' },
-  other:     { label:'Other',             icon:'📦', color:'#8896AA', bg:'rgba(136,150,170,.1)' },
-};
 
-const CP_TYPES = {
-  flat:     'Flat Rate',
-  pct:      '% of Base',
-  dynamic:  'Dynamic Bands',
-  per_unit: 'Per Unit',
-};
 
 // ── Render the Custom Products admin section ─────────────────────────
 function renderCustomProductsSection() {
@@ -3393,9 +3748,6 @@ function cpPriceSummary(p) {
   return { list:'—', target:'—' };
 }
 
-function escHtml(s) {
-  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
 
 // ── Modal open/close ─────────────────────────────────────────────────
 let cpCurrentType = 'flat';
@@ -3576,6 +3928,789 @@ document.addEventListener('click', function(e) {
   if(modal && e.target === modal) closeCPModal();
 });
 
+
+
+// ═══════════════════════════════════════════════════════════════════
+// CUSTOMER CONTRACTS — Live SKU Ledger + Contract Object
+// ═══════════════════════════════════════════════════════════════════
+
+// ── State ────────────────────────────────────────────────────────
+var contractFilter = 'all'; // all | contracted | renewing | draft
+
+function setContractFilter(f) {
+  contractFilter = f;
+  ['all','contracted','renewing','draft'].forEach(function(k) {
+    var btn = el('cf'+k.charAt(0).toUpperCase()+k.slice(1));
+    if(btn) btn.classList.toggle('active', k===f);
+  });
+  renderContracts();
+}
+
+// ── Helper: days until a date ────────────────────────────────────
+function daysUntil(dateStr) {
+  if(!dateStr) return null;
+  var diff = new Date(dateStr) - new Date();
+  return Math.round(diff / (1000*60*60*24));
+}
+
+// ── Helper: compute end date from deal ──────────────────────────
+function dealEndDate(d) {
+  if(d.endDate) return d.endDate;
+  if(!d.startDate) return null;
+  var dt = new Date(d.startDate);
+  dt.setMonth(dt.getMonth() + (parseInt(d.termMonths)||12));
+  return dt.toISOString().slice(0,10);
+}
+
+// ── Mark a deal as contracted ────────────────────────────────────
+function markContracted() {
+  if(!state.dealId) return;
+  var snap = saveDeal();
+  var idx = deals.findIndex(function(d){ return d.dealId===snap.dealId; });
+  if(idx < 0) return;
+  deals[idx].contracted = !deals[idx].contracted;
+  deals[idx].contractedAt = deals[idx].contracted ? new Date().toISOString() : null;
+  deals[idx].status = deals[idx].contracted ? 'Contracted' : (snap.disc<=15?'Approved':'Pending Approval');
+  saveDeals(deals);
+  state.contracted = deals[idx].contracted;
+  state.contractedAt = deals[idx].contractedAt;
+  // Refresh button label
+  var btn = el('btnContracted');
+  if(btn) {
+    btn.textContent = state.contracted ? '✅ Contracted' : '🔒 Mark as Contracted';
+    btn.style.background = state.contracted ? '#00B87A' : '#0B1829';
+  }
+  renderDashboard();
+}
+
+// Toggle contracted status from the detail panel
+function toggleContractedFromDetail() {
+  var dealId = el('contractDetail').dataset.dealId;
+  if(!dealId) return;
+  var idx = deals.findIndex(function(d){ return d.dealId===dealId; });
+  if(idx < 0) return;
+  deals[idx].contracted = !deals[idx].contracted;
+  deals[idx].contractedAt = deals[idx].contracted ? new Date().toISOString() : null;
+  deals[idx].status = deals[idx].contracted ? 'Contracted' : (deals[idx].disc<=15?'Approved':'Pending Approval');
+  saveDeals(deals);
+  // Re-render detail + list
+  openContractDetail(dealId);
+  renderContracts();
+}
+
+// ── Group deals by company ───────────────────────────────────────
+function groupDealsByCompany() {
+  var byCompany = {};
+  deals.filter(function(d){ return d.legal && d.totalNet > 0; }).forEach(function(d) {
+    var key = (d.legal||'').toLowerCase().trim();
+    if(!byCompany[key]) byCompany[key] = { name: d.legal, deals: [] };
+    if(!byCompany[key].deals.find(function(x){ return x.dealId===d.dealId; }))
+      byCompany[key].deals.push(d);
+  });
+  return byCompany;
+}
+
+// ── Main render ──────────────────────────────────────────────────
+function renderContracts() {
+  var container = el('contractsList');
+  if(!container) return;
+  var query = (el('contractSearch')?.value||'').toLowerCase().trim();
+  var byCompany = groupDealsByCompany();
+  var companies = Object.values(byCompany)
+    .filter(function(c){ return !query || c.name.toLowerCase().includes(query); })
+    .sort(function(a,b){ return a.name.localeCompare(b.name); });
+
+  // ── KPIs ──
+  var allDeals = deals.filter(function(d){ return d.legal && d.totalNet>0; });
+  var contracted = allDeals.filter(function(d){ return d.contracted; });
+  var totalArr = contracted.reduce(function(s,d){ return s+(d.totalNet||0); }, 0);
+  var renewingSoon = allDeals.filter(function(d){
+    var days = daysUntil(dealEndDate(d));
+    return days !== null && days >= 0 && days <= 90;
+  });
+  var kpiEl = el('contractKpis');
+  if(kpiEl) {
+    kpiEl.innerHTML = [
+      { lbl:'Contracted ARR', val:fmt(totalArr), sub:contracted.length+' contracts' },
+      { lbl:'Total Customers', val:String(companies.length), sub:'with active deals' },
+      { lbl:'Renewing ≤90 days', val:String(renewingSoon.length), sub:renewingSoon.length>0?'⚠ action needed':'all good' },
+      { lbl:'Draft / Pending', val:String(allDeals.filter(function(d){ return !d.contracted; }).length), sub:'not yet contracted' },
+    ].map(function(k){
+      return '<div class="contract-kpi"><div class="contract-kpi-lbl">'+k.lbl+'</div>'
+        +'<div class="contract-kpi-val">'+k.val+'</div>'
+        +'<div class="contract-kpi-sub">'+k.sub+'</div></div>';
+    }).join('');
+  }
+
+  // ── Filter ──
+  var filtered = companies.filter(function(c) {
+    if(contractFilter === 'all') return true;
+    var primaryDeal = c.deals.slice().sort(function(a,b){ return new Date(b.submittedAt||0)-new Date(a.submittedAt||0); })
+      .find(function(d){ return d.dealType==='NB'; }) || c.deals[0];
+    if(contractFilter === 'contracted') return primaryDeal.contracted;
+    if(contractFilter === 'draft') return !primaryDeal.contracted;
+    if(contractFilter === 'renewing') {
+      var days = daysUntil(dealEndDate(primaryDeal));
+      return days !== null && days >= 0 && days <= 90;
+    }
+    return true;
+  });
+
+  if(!filtered.length) {
+    container.innerHTML = '<div style="text-align:center;padding:60px 20px;color:var(--faint);font-size:13px">'
+      + (query ? 'No customers matching "'+escHtml(query)+'"' : 'No deals match this filter.')+'</div>';
+    return;
+  }
+
+  container.innerHTML = filtered.map(function(c) {
+    var sortedDeals = c.deals.slice().sort(function(a,b){ return new Date(b.submittedAt||0)-new Date(a.submittedAt||0); });
+    var primaryDeal = sortedDeals.find(function(d){ return d.dealType==='NB'; }) || sortedDeals[0];
+    var amendments = sortedDeals.filter(function(d){ return d !== primaryDeal; });
+    var endDate = dealEndDate(primaryDeal);
+    var daysLeft = daysUntil(endDate);
+    var isContracted = primaryDeal.contracted;
+    var isRenewing = daysLeft !== null && daysLeft >= 0 && daysLeft <= 90;
+    var items = getLineItemsForDeal(primaryDeal);
+    var dtc = dealTypeColor(primaryDeal.dealType);
+
+    var cardClass = 'contract-card' + (isContracted?' contracted':'') + (isRenewing?' renewing-soon':'');
+
+    // Status badge
+    var statusBg = isContracted ? '#00B87A' : primaryDeal.status==='Approved' ? '#16A34A' : '#B45309';
+    var statusLabel = isContracted ? '🔒 Contracted' : (primaryDeal.status||'Draft');
+
+    // Renewal alert
+    var renewalHtml = '';
+    if(isRenewing && isContracted) {
+      renewalHtml = '<div class="renewal-alert">⏰ <strong>Renewing in '+daysLeft+' days</strong> · Contract ends '+endDate+' · Take action now</div>';
+    }
+
+    return '<div class="'+cardClass+'" onclick="openContractDetail(\''+primaryDeal.dealId+'\')">'
+      // Header
+      + '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px">'
+      +   '<div>'
+      +     '<div style="font-size:15px;font-weight:700;color:var(--text)">'+escHtml(c.name)+'</div>'
+      +     '<div style="font-size:11px;color:var(--muted);margin-top:3px">'
+      +       escHtml(primaryDeal.contact||'')+(primaryDeal.email?' · '+escHtml(primaryDeal.email):'')
+      +     '</div>'
+      +   '</div>'
+      +   '<div style="display:flex;gap:6px;align-items:center;flex-shrink:0">'
+      +     (isContracted?'<span style="padding:3px 10px;border-radius:12px;font-size:10px;font-weight:700;background:#00B87A22;color:#00B87A;border:1px solid #00B87A44">🔒 Contracted</span>':'')
+      +     (isRenewing?'<span style="padding:3px 10px;border-radius:12px;font-size:10px;font-weight:700;background:#E89B0022;color:#E89B00;border:1px solid #E89B0044">⏰ '+daysLeft+'d left</span>':'')
+      +   '</div>'
+      + '</div>'
+      + renewalHtml
+      // Stats grid
+      + '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:12px">'
+      +   contractStatCell('Deal ID', '<span style="font-family:var(--mono);font-size:10px">'+escHtml(primaryDeal.dealId)+'</span>')
+      +   contractStatCell('Net ARR', '<span style="color:var(--blue);font-weight:700">'+fmt(primaryDeal.totalNet||0)+'</span>')
+      +   contractStatCell('Start Date', primaryDeal.startDate||'—')
+      +   contractStatCell('End Date', endDate||(isContracted?'—':'Not set'))
+      +   contractStatCell('Term', (primaryDeal.termMonths||12)+' months')
+      + '</div>'
+      // SKU chips
+      + '<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px">'
+      + items.slice(0,5).map(function(item){
+          return '<span style="padding:2px 9px;background:#F1F5F9;border:1px solid var(--border);border-radius:10px;font-size:10px;color:var(--muted);white-space:nowrap">'+escHtml(item.name)+'</span>';
+        }).join('')
+      + (items.length>5 ? '<span style="padding:2px 9px;background:#EEF2FF;border:1px solid #C7D2FE;border-radius:10px;font-size:10px;color:#3154C4;font-weight:600">+' + (items.length-5) + ' more</span>' : '')
+      + '</div>'
+      // Amendments
+      + (amendments.length ? '<div style="border-top:1px solid var(--border);padding-top:8px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
+        + '<span style="font-size:10px;color:var(--faint);font-weight:600">AMENDMENTS:</span>'
+        + amendments.map(function(d){
+            var dtColor = dealTypeColor(d.dealType);
+            return '<span class="amendment-pill" style="background:'+dtColor+'22;color:'+dtColor+';border:1px solid '+dtColor+'44" onclick="event.stopPropagation();openContractDetail(\''+d.dealId+'\')">'+ d.dealId+' ('+dealTypeLabel(d.dealType)+')</span>';
+          }).join('')
+        + '</div>' : '')
+      + '</div>';
+  }).join('');
+}
+
+function contractStatCell(lbl, valHtml) {
+  return '<div style="padding:8px 10px;background:#F8FAFC;border:1px solid var(--border);border-radius:8px">'
+    +'<div class="contract-stat-lbl">'+lbl+'</div>'
+    +'<div class="contract-stat-val">'+valHtml+'</div>'
+    +'</div>';
+}
+
+// ── Line items from a saved deal ─────────────────────────────────
+function getLineItemsForDeal(d) {
+  var items = [];
+  if(d.platformList>0) items.push({name:'Platform — '+(d.platformTier||'Unknown'), cat:'Platform', list:d.platformList, net:d.platformNet||d.platformList});
+  (d.users||[]).forEach(function(u) {
+    if(u.qty>0 && u.type!=='Guest') items.push({name:'Users — '+u.type+' (×'+u.qty+')', cat:'Users', list:u.annualList||0, net:u.net||0});
+  });
+  var ADDON_NAMES = {dpm:'Data Products Marketplace',apc:'Adv. Policy & Compliance',ins:'Insights',dqs:'Data Quality Studio',advsup:'Advanced Support'};
+  Object.entries(d.addons||{}).forEach(function(e) {
+    var id=e[0], ad=e[1];
+    if(ad && ad.active && ad.list>0) items.push({name:ADDON_NAMES[id]||id, cat:'Add-on', list:ad.list, net:ad.net||0});
+  });
+  var c = d.connectors||{};
+  if(c.qty>0) items.push({name:'Custom Connectors (×'+c.qty+')', cat:'Connectors', list:c.list||0, net:c.net||0});
+  (d.services||[]).forEach(function(s) {
+    if(s.active && s.list>0) items.push({name:'Implementation & Advisory Services', cat:'Services', list:s.list, net:s.net||s.list});
+  });
+  (d.customSkus||[]).forEach(function(s) {
+    if(s.list>0) items.push({name:s.name||'Custom SKU', cat:'Custom', list:s.list, net:s.net||s.list});
+  });
+  // Custom products
+  var cpList = loadCustomProducts();
+  cpList.forEach(function(cp) {
+    var cpd = (d.customProducts||{})[cp.id];
+    if(cpd && cpd.active && cpd.list>0) items.push({name:cp.name, cat:'Add-on', list:cpd.list, net:cpd.net||0});
+  });
+  return items;
+}
+
+// ── Open detail panel ─────────────────────────────────────────────
+function openContractDetail(dealId) {
+  var d = deals.find(function(x){ return x.dealId===dealId; });
+  if(!d) return;
+
+  var panel = el('contractDetail');
+  var backdrop = el('contractDetailBackdrop');
+  panel.dataset.dealId = dealId;
+  panel.classList.remove('hidden');
+  if(backdrop) backdrop.classList.remove('hidden');
+
+  el('cdCompanyName').textContent = d.legal||d.dealId;
+  var endDate = dealEndDate(d);
+  var daysLeft = daysUntil(endDate);
+  el('cdDealMeta').textContent = dealId + ' · ' + dealTypeLabel(d.dealType) + ' · ' + (d.startDate||'—') + ' → ' + (endDate||'—') + (daysLeft!==null?' ('+daysLeft+'d left)':'');
+
+  // Update contracted button
+  var btn = el('cdContractBtn');
+  if(btn) {
+    btn.textContent = d.contracted ? '✅ Contracted' : '🔒 Mark as Contracted';
+    btn.style.background = d.contracted ? '#00B87A' : '#0B1829';
+  }
+
+  var items = getLineItemsForDeal(d);
+  var totalList = items.reduce(function(s,i){ return s+i.list; }, 0);
+  var totalNet  = items.reduce(function(s,i){ return s+i.net; }, 0);
+  var disc = discPct(totalList, totalNet);
+  var tier = getTier(disc);
+
+  var html = '';
+
+  // Contracted status banner
+  if(d.contracted) {
+    html += '<div style="padding:10px 14px;background:#ECFDF5;border:1px solid #6EE7B7;border-radius:8px;margin-bottom:16px;display:flex;align-items:center;gap:10px">'
+      +'<div style="font-size:20px">🔒</div>'
+      +'<div><div style="font-weight:700;color:#065F46;font-size:13px">Active Contract</div>'
+      +'<div style="font-size:11px;color:#047857">Contracted on '+new Date(d.contractedAt||d.submittedAt||Date.now()).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})+'</div>'
+      +'</div></div>';
+  }
+
+  // Renewal alert
+  if(daysLeft !== null && daysLeft >= 0 && daysLeft <= 90) {
+    var urgency = daysLeft <= 30 ? '#D63B3B' : '#E89B00';
+    html += '<div class="renewal-alert" style="background:'+urgency+'11;border-color:'+urgency+'44;color:'+urgency+'">⏰ <strong>Renews in '+daysLeft+' days</strong> — '+endDate+' · Start renewal process now</div>';
+  }
+
+  // Summary stats
+  html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px">'
+    + cdStatBox('Net ARR', fmt(totalNet), 'var(--blue)')
+    + cdStatBox('Blended Disc', disc.toFixed(1)+'%', tier.color)
+    + cdStatBox('Approver', tier.approver, tier.color)
+    + '</div>';
+
+  // Contract details
+  html += '<div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">Contract Details</div>';
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:20px">'
+    + cdField('Entity', d.entity||'—')
+    + cdField('Start Date', d.startDate||'—')
+    + cdField('End Date', endDate||'—')
+    + cdField('Term', (d.termMonths||12)+' months')
+    + cdField('Payment Terms', d.payTerms||'—')
+    + cdField('Billing Frequency', d.billFreq||'—')
+    + cdField('Currency', d.currency||'USD')
+    + cdField('Status', d.status||'Draft')
+    + cdField('Rep', d.repName||'—')
+    + cdField('Renewal Type', d.renewalType==='manual'?'Manual':'Auto ('+( d.renewalDays||30)+'d notice)')
+    + '</div>';
+
+  // Active SKUs by category
+  html += '<div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">Active SKUs</div>';
+  var catColors = {Platform:'#1B5FC4',Users:'#009DB5','Add-on':'#6B4FA8',Connectors:'#009DB5',Services:'#E89B00',Custom:'#4A5568'};
+  var grouped = {};
+  items.forEach(function(item) {
+    if(!grouped[item.cat]) grouped[item.cat] = [];
+    grouped[item.cat].push(item);
+  });
+
+  if(!items.length) {
+    html += '<div style="padding:16px;text-align:center;color:var(--faint);font-size:12px">No line items on this deal yet.</div>';
+  } else {
+    Object.entries(grouped).forEach(function(e) {
+      var cat=e[0], catItems=e[1];
+      var color = catColors[cat]||'#4A5568';
+      html += '<div style="margin-bottom:14px">'
+        +'<div style="font-size:10px;font-weight:700;color:'+color+';letter-spacing:.5px;text-transform:uppercase;margin-bottom:6px;padding:3px 8px;background:'+color+'11;border-radius:4px;display:inline-block">'+cat+'</div>';
+      catItems.forEach(function(item) {
+        var itemDisc = discPct(item.list, item.net);
+        html += '<div class="sku-row">'
+          +'<div style="flex:1">'
+          +  '<div style="font-size:12px;font-weight:600">'+escHtml(item.name)+'</div>'
+          +'</div>'
+          +'<div style="display:flex;gap:14px;align-items:center;font-size:11px">'
+          +  '<span style="color:var(--faint)">List: '+fmt(item.list)+'</span>'
+          +  '<span style="font-weight:700;color:var(--blue)">Net: '+fmt(item.net)+'</span>'
+          +  '<span style="padding:2px 8px;border-radius:8px;background:'+colorForDisc(itemDisc)+'22;color:'+colorForDisc(itemDisc)+';font-weight:700;font-size:10px">'+itemDisc.toFixed(1)+'%</span>'
+          +'</div>'
+          +'</div>';
+      });
+      html += '</div>';
+    });
+  }
+
+  // Total
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:#0B1829;border-radius:10px;margin-bottom:20px">'
+    +'<div style="font-size:13px;font-weight:700;color:#fff">Total Contract Value (ARR)</div>'
+    +'<div style="display:flex;gap:16px;align-items:center">'
+    +  '<span style="font-size:11px;color:rgba(255,255,255,.4)">List: '+fmt(totalList)+'</span>'
+    +  '<span style="font-size:16px;font-weight:700;color:#6B8FFF">'+fmt(totalNet)+'</span>'
+    +  '<span style="padding:3px 9px;border-radius:8px;background:'+tier.color+'33;color:'+tier.color+';font-size:11px;font-weight:700">'+disc.toFixed(1)+'%</span>'
+    +'</div>'
+    +'</div>';
+
+  // Amendments / related deals
+  var relatedDeals = deals.filter(function(x){
+    return x.dealId !== dealId && x.legal && x.legal.toLowerCase() === (d.legal||'').toLowerCase();
+  });
+  if(relatedDeals.length) {
+    html += '<div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">Deal History</div>';
+    html += '<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:20px">';
+    relatedDeals.forEach(function(rd) {
+      var rdColor = dealTypeColor(rd.dealType);
+      var rdEnd = dealEndDate(rd);
+      html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:#F8FAFC;border:1px solid var(--border);border-radius:8px;cursor:pointer" onclick="openContractDetail(\''+rd.dealId+'\')">'
+        +'<div style="display:flex;align-items:center;gap:8px">'
+        +  '<span style="padding:2px 8px;border-radius:8px;font-size:10px;font-weight:700;background:'+rdColor+'22;color:'+rdColor+'">'+dealTypeLabel(rd.dealType)+'</span>'
+        +  '<span style="font-size:12px;font-weight:600;font-family:var(--mono)">'+rd.dealId+'</span>'
+        +'</div>'
+        +'<div style="display:flex;gap:12px;align-items:center;font-size:11px">'
+        +  '<span style="color:var(--faint)">'+(rd.startDate||'—')+' → '+(rdEnd||'—')+'</span>'
+        +  '<span style="font-weight:700;color:var(--blue)">'+fmt(rd.totalNet||0)+'</span>'
+        +  (rd.contracted?'<span style="color:#00B87A;font-size:10px">🔒</span>':'')
+        +'</div>'
+        +'</div>';
+    });
+    html += '</div>';
+  }
+
+  // Actions
+  html += '<div style="display:flex;gap:8px">'
+    +'<button onclick="openDeal(\''+dealId+'\')" style="flex:1;padding:9px;border-radius:8px;background:var(--blue);border:none;color:#fff;font-size:12px;font-weight:700;cursor:pointer">✏️ Open &amp; Edit Deal</button>'
+    +'<button onclick="closeContractDetail()" style="padding:9px 16px;border-radius:8px;border:1px solid var(--border);background:#fff;font-size:12px;font-weight:600;cursor:pointer;color:var(--muted)">Close</button>'
+    +'</div>';
+
+  el('cdBody').innerHTML = html;
+}
+
+function cdStatBox(lbl, val, color) {
+  return '<div style="padding:12px;background:#F8FAFC;border-radius:8px;border:1px solid var(--border);text-align:center">'
+    +'<div style="font-size:10px;font-weight:600;color:var(--faint);letter-spacing:.4px;text-transform:uppercase;margin-bottom:4px">'+lbl+'</div>'
+    +'<div style="font-size:16px;font-weight:700;color:'+color+'">'+val+'</div>'
+    +'</div>';
+}
+
+function cdField(label, val) {
+  return '<div style="padding:8px 10px;background:#F8FAFC;border:1px solid var(--border);border-radius:6px">'
+    +'<div style="font-size:10px;color:var(--faint);font-weight:600;margin-bottom:2px">'+label+'</div>'
+    +'<div style="font-size:12px;font-weight:600">'+escHtml(String(val))+'</div>'
+    +'</div>';
+}
+
+function closeContractDetail() {
+  var panel = el('contractDetail');
+  var backdrop = el('contractDetailBackdrop');
+  if(panel) panel.classList.add('hidden');
+  if(backdrop) backdrop.classList.add('hidden');
+}
+
+// ── Renewal alerts on Dashboard ──────────────────────────────────
+function getRenewalAlerts() {
+  return deals.filter(function(d) {
+    if(!d.contracted || !d.legal) return false;
+    var end = dealEndDate(d);
+    var days = daysUntil(end);
+    return days !== null && days >= 0 && days <= 90;
+  }).sort(function(a,b) {
+    return daysUntil(dealEndDate(a)) - daysUntil(dealEndDate(b));
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// QUOTE LIFECYCLE + CONTRACT OBJECT ENGINE
+// Quotes → Accepted → Contracts (separate localStorage stores)
+// ═══════════════════════════════════════════════════════════════════
+
+const CONTRACTS_KEY = 'atlan_cpq_contracts';
+
+// ── Contract store ───────────────────────────────────────────────
+function loadContracts() {
+  try { return JSON.parse(localStorage.getItem(CONTRACTS_KEY)||'[]'); } catch(e) { return []; }
+}
+function saveContracts(arr) {
+  try { localStorage.setItem(CONTRACTS_KEY, JSON.stringify(arr)); } catch(e) {}
+}
+function genContractId() {
+  return 'C-' + Date.now().toString(36).toUpperCase().slice(-4) + Math.random().toString(36).slice(2,5).toUpperCase();
+}
+
+// ── Quote status helpers ─────────────────────────────────────────
+const QUOTE_STATUS_ORDER = ['Draft','Pending Approval','Approved','Accepted','Rejected','Contracted'];
+const QUOTE_STATUS_COLOR = {
+  'Draft':'#8896AA', 'Pending Approval':'#E89B00', 'Approved':'#3154C4',
+  'Accepted':'#6B4FA8', 'Rejected':'#D63B3B', 'Contracted':'#00B87A'
+};
+const QUOTE_STATUS_ICON = {
+  'Draft':'📝', 'Pending Approval':'⏳', 'Approved':'✅',
+  'Accepted':'🤝', 'Rejected':'❌', 'Contracted':'🔒'
+};
+
+function setQuoteStatus(dealId, newStatus) {
+  var idx = deals.findIndex(function(d){ return d.dealId===dealId; });
+  if(idx < 0) return false;
+  deals[idx].quoteStatus = newStatus;
+  deals[idx].status = newStatus;
+  if(newStatus==='Accepted') deals[idx].quoteAcceptedAt = new Date().toISOString();
+  saveDeals(deals);
+  return true;
+}
+
+// ── Accept Quote (customer has signed) ──────────────────────────
+function acceptQuote() {
+  var snap = saveDeal();
+  var idx = deals.findIndex(function(d){ return d.dealId===snap.dealId; });
+  if(idx < 0) return;
+
+  var current = deals[idx].quoteStatus||'Draft';
+  if(current === 'Rejected') { alert('This quote has been rejected and cannot be accepted.'); return; }
+  if(current === 'Accepted' || current === 'Contracted') {
+    alert('This quote is already '+current+'.'); return;
+  }
+
+  deals[idx].quoteStatus = 'Accepted';
+  deals[idx].status = 'Accepted';
+  deals[idx].quoteAcceptedAt = new Date().toISOString();
+  state.quoteStatus = 'Accepted';
+  saveDeals(deals);
+
+  // Update button states
+  updateOFButtons();
+  renderDashboard();
+  alert('Quote '+snap.dealId+' marked as Accepted. You can now create the Contract.');
+}
+
+// ── Reject Quote ─────────────────────────────────────────────────
+function rejectQuote(dealId) {
+  if(!confirm('Mark this quote as Rejected?')) return;
+  setQuoteStatus(dealId || state.dealId, 'Rejected');
+  if(dealId === state.dealId || !dealId) {
+    state.quoteStatus = 'Rejected';
+    updateOFButtons();
+  }
+  renderQuotes();
+  renderDashboard();
+}
+
+// ── Update OF buttons based on current quoteStatus ───────────────
+function updateOFButtons() {
+  var qs = state.quoteStatus || 'Draft';
+  var acceptBtn = el('btnAcceptQuote');
+  var contractBtn = el('btnCreateContract');
+  if(!acceptBtn || !contractBtn) return;
+
+  if(qs === 'Accepted') {
+    acceptBtn.textContent = '🤝 Accepted';
+    acceptBtn.style.background = '#6B4FA8';
+    acceptBtn.disabled = true;
+    contractBtn.classList.remove('hidden');
+  } else if(qs === 'Contracted') {
+    acceptBtn.textContent = '🔒 Contracted';
+    acceptBtn.style.background = '#00B87A';
+    acceptBtn.disabled = true;
+    contractBtn.classList.add('hidden');
+  } else if(qs === 'Rejected') {
+    acceptBtn.textContent = '❌ Rejected';
+    acceptBtn.style.background = '#D63B3B';
+    acceptBtn.disabled = true;
+    contractBtn.classList.add('hidden');
+  } else {
+    acceptBtn.textContent = '🤝 Accept Quote';
+    acceptBtn.style.background = '#6B4FA8';
+    acceptBtn.disabled = false;
+    contractBtn.classList.add('hidden');
+  }
+}
+
+// ── Create Contract from Accepted Quote ─────────────────────────
+function createContractFromQuote() {
+  var qs = state.quoteStatus;
+  if(qs !== 'Accepted') {
+    alert('The quote must be Accepted before a Contract can be created.'); return;
+  }
+
+  // Block duplicate NB contracts for same legal name
+  if(state.dealType === 'NB') {
+    var existing = loadContracts().find(function(c){
+      return c.legal && state.legal &&
+             c.legal.toLowerCase() === state.legal.toLowerCase() &&
+             c.status === 'Active';
+    });
+    if(existing) {
+      alert('An active contract already exists for "'+state.legal+'" ('+existing.contractId+'). '
+        +'A new New Business contract cannot be created until the existing one has expired or been cancelled.');
+      return;
+    }
+  }
+
+  var snap = saveDeal();
+  var items = getLineItemsForDeal(snap);
+  var totalNet = items.reduce(function(s,i){ return s+i.net; },0);
+  var totalList = items.reduce(function(s,i){ return s+i.list; },0);
+
+  var contractId = genContractId();
+  var endDate = snap.endDate || (function(){
+    if(!snap.startDate) return '';
+    var d = new Date(snap.startDate);
+    d.setMonth(d.getMonth()+(parseInt(snap.termMonths)||12));
+    return d.toISOString().slice(0,10);
+  })();
+
+  var contract = {
+    contractId: contractId,
+    sourceQuoteId: snap.dealId,
+    sourceSfdcOppId: snap.sfdcOppId||'',
+    parentContractId: snap.parentContractId||'',
+    dealType: snap.dealType,
+
+    // Account fields
+    legal: snap.legal, billing: snap.billing,
+    contact: snap.contact, email: snap.email,
+    entity: snap.entity, currency: snap.currency,
+    payTerms: snap.payTerms, billFreq: snap.billFreq,
+    poRequired: snap.poRequired, poNum: snap.poNum,
+    repName: snap.repName,
+
+    // Subscription fields
+    platformTier: snap.platformTier, assets: snap.assets,
+    platformList: snap.platformList, platformNet: snap.platformNet,
+    users: snap.users,
+    addons: snap.addons,
+    connectors: snap.connectors,
+    services: snap.services,
+    customSkus: snap.customSkus||[],
+    customProducts: snap.customProducts||{},
+
+    // Contract terms
+    startDate: snap.startDate,
+    endDate: endDate,
+    termMonths: snap.termMonths,
+    renewalType: snap.renewalType,
+    renewalDays: snap.renewalDays,
+    uplift: snap.uplift,
+    totalList: totalList,
+    totalNet: totalNet,
+    disc: snap.disc,
+
+    // Lifecycle
+    status: 'Active',  // Active | Amended | Renewed | Cancelled | Expired
+    createdAt: new Date().toISOString(),
+    createdBy: SESSION_USER.name,
+    amendments: [],    // array of contractIds for amendments
+    renewedBy: null,   // contractId of the renewal that replaced this
+  };
+
+  // Handle UP/RN: update parent contract
+  if(snap.dealType === 'UP' && snap.parentContractId) {
+    var contracts = loadContracts();
+    var parentIdx = contracts.findIndex(function(c){ return c.contractId===snap.parentContractId; });
+    if(parentIdx >= 0) {
+      contracts[parentIdx].amendments = contracts[parentIdx].amendments||[];
+      contracts[parentIdx].amendments.push(contractId);
+      contracts[parentIdx].status = 'Amended';
+      contracts.push(contract);
+      saveContracts(contracts);
+    } else {
+      var all = loadContracts();
+      all.push(contract);
+      saveContracts(all);
+    }
+  } else if(snap.dealType === 'RN' && snap.renewalFromContractId) {
+    var contracts2 = loadContracts();
+    var origIdx = contracts2.findIndex(function(c){ return c.contractId===snap.renewalFromContractId; });
+    if(origIdx >= 0) {
+      contracts2[origIdx].renewedBy = contractId;
+      contracts2[origIdx].status = 'Renewed';
+    }
+    contracts2.push(contract);
+    saveContracts(contracts2);
+  } else {
+    var all2 = loadContracts();
+    all2.push(contract);
+    saveContracts(all2);
+  }
+
+  // Update quote status to Contracted
+  var dIdx = deals.findIndex(function(d){ return d.dealId===snap.dealId; });
+  if(dIdx >= 0) {
+    deals[dIdx].quoteStatus = 'Contracted';
+    deals[dIdx].status = 'Contracted';
+    deals[dIdx].contractId = contractId;
+  }
+  state.quoteStatus = 'Contracted';
+  state.contractId = contractId;
+  saveDeals(deals);
+  updateOFButtons();
+  renderDashboard();
+  renderContracts();
+
+  alert('Contract '+contractId+' created successfully! View it in the Contracts tab.');
+}
+
+// ── showView handler for quotes ──────────────────────────────────
+var quoteFilter = 'all';
+function setQuoteFilter(f) {
+  quoteFilter = f;
+  ['all','Draft','Pending Approval','Approved','Accepted','Rejected'].forEach(function(k) {
+    var id = 'qf'+(k==='all'?'All':k==='Pending Approval'?'Pending':k==='Pending Approval'?'Pending':k);
+    // Use simple map
+  });
+  ['qfAll','qfDraft','qfPending','qfApproved','qfAccepted','qfRejected'].forEach(function(id, i){
+    var btn = el(id);
+    var statuses = ['all','Draft','Pending Approval','Approved','Accepted','Rejected'];
+    if(btn) btn.classList.toggle('active', statuses[i]===f);
+  });
+  renderQuotes();
+}
+
+function renderQuotes() {
+  var container = el('quotesList');
+  if(!container) return;
+
+  var query = (el('quoteSearch')?.value||'').toLowerCase().trim();
+  var allQuotes = deals.filter(function(d){ return d.sfdcOppId || d.quoteStatus; });
+
+  // Filter
+  var filtered = allQuotes.filter(function(d){
+    if(query && !(d.legal||'').toLowerCase().includes(query) && !(d.dealId||'').toLowerCase().includes(query) && !(d.sfdcOppId||'').toLowerCase().includes(query)) return false;
+    if(quoteFilter === 'all') return true;
+    return (d.quoteStatus||'Draft') === quoteFilter;
+  });
+
+  // KPIs
+  var kpiEl = el('quoteKpis');
+  if(kpiEl) {
+    var counts = {};
+    QUOTE_STATUS_ORDER.forEach(function(s){ counts[s]=0; });
+    allQuotes.forEach(function(d){ counts[d.quoteStatus||'Draft']=(counts[d.quoteStatus||'Draft']||0)+1; });
+    kpiEl.innerHTML = QUOTE_STATUS_ORDER.slice(0,5).map(function(s){
+      return '<div class="contract-kpi" style="cursor:pointer" onclick="setQuoteFilter(\''+s+'\')">'
+        +'<div class="contract-kpi-lbl">'+QUOTE_STATUS_ICON[s]+' '+s+'</div>'
+        +'<div class="contract-kpi-val" style="color:'+(QUOTE_STATUS_COLOR[s]||'#fff')+'">'+counts[s]+'</div>'
+        +'</div>';
+    }).join('');
+  }
+
+  if(!filtered.length) {
+    container.innerHTML = '<div style="text-align:center;padding:60px 20px;color:var(--faint);font-size:13px">'
+      +(query?'No quotes matching "'+escHtml(query)+'"':'No quotes yet. Click + New Deal to create the first quote.')+'</div>';
+    return;
+  }
+
+  // Sort newest first
+  filtered.sort(function(a,b){ return new Date(b.createdAt||0)-new Date(a.createdAt||0); });
+
+  container.innerHTML = filtered.map(function(d) {
+    var qs = d.quoteStatus||'Draft';
+    var qc = QUOTE_STATUS_COLOR[qs]||'#8896AA';
+    var qi = QUOTE_STATUS_ICON[qs]||'📝';
+    var dtc = dealTypeColor(d.dealType);
+    var items = getLineItemsForDeal(d);
+
+    return '<div style="background:#fff;border:1px solid var(--border);border-left:4px solid '+qc+';border-radius:10px;padding:16px 20px;margin-bottom:10px;cursor:pointer" onclick="openQuoteDetail(\''+d.dealId+'\')">'
+      +'<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px">'
+      +  '<div>'
+      +    '<div style="font-size:14px;font-weight:700;color:var(--text)">'+escHtml(d.legal||'(no company)')+'</div>'
+      +    '<div style="font-size:11px;color:var(--muted);margin-top:2px;display:flex;align-items:center;gap:8px">'
+      +      '<span style="font-family:var(--mono);font-weight:600">'+d.dealId+'</span>'
+      +      (d.sfdcOppId?'<span style="color:var(--faint)">SFDC: '+escHtml(d.sfdcOppId)+'</span>':'')
+      +      (d.parentContractId?'<span style="color:var(--faint)">Contract: '+escHtml(d.parentContractId)+'</span>':'')
+      +    '</div>'
+      +  '</div>'
+      +  '<div style="display:flex;gap:6px;align-items:center">'
+      +    '<span style="padding:3px 10px;border-radius:12px;font-size:10px;font-weight:700;background:'+qc+'22;color:'+qc+';border:1px solid '+qc+'44">'+qi+' '+qs+'</span>'
+      +    '<span style="padding:3px 10px;border-radius:12px;font-size:10px;font-weight:700;background:'+dtc+'22;color:'+dtc+';border:1px solid '+dtc+'44">'+dealTypeLabel(d.dealType)+'</span>'
+      +  '</div>'
+      +'</div>'
+      +'<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:10px">'
+      +  contractStatCell('Net Value', '<span style="color:var(--blue);font-weight:700">'+fmt(d.totalNet||0)+'</span>')
+      +  contractStatCell('Discount', '<span style="color:'+colorForDisc(d.disc||0)+';font-weight:700">'+(d.disc||0).toFixed(1)+'%</span>')
+      +  contractStatCell('Start Date', d.startDate||'—')
+      +  contractStatCell('Term', (d.termMonths||12)+' mo')
+      +  contractStatCell('Rep', d.repName||'—')
+      +'</div>'
+      +'<div style="display:flex;align-items:center;justify-content:space-between">'
+      +  '<div style="display:flex;flex-wrap:wrap;gap:5px">'
+      +    items.slice(0,4).map(function(item){
+             return '<span style="padding:2px 8px;background:#F1F5F9;border:1px solid var(--border);border-radius:10px;font-size:10px;color:var(--muted)">'+escHtml(item.name)+'</span>';
+           }).join('')
+      +    (items.length>4?'<span style="padding:2px 8px;background:#EEF2FF;border:1px solid #C7D2FE;border-radius:10px;font-size:10px;color:#3154C4">+'+(items.length-4)+' more</span>':'')
+      +  '</div>'
+      +  '<div style="display:flex;gap:6px">'
+      +    (qs==='Accepted'?'<button onclick="event.stopPropagation();openDeal(\''+d.dealId+'\');setTimeout(function(){createContractFromQuote();},300)" style="padding:4px 12px;border-radius:6px;background:#00B87A;border:none;color:#fff;font-size:11px;font-weight:700;cursor:pointer">🔒 Create Contract</button>':'')
+      +    (qs!=='Rejected'&&qs!=='Contracted'?'<button onclick="event.stopPropagation();openDeal(\''+d.dealId+'\')" style="padding:4px 12px;border-radius:6px;background:var(--blue);border:none;color:#fff;font-size:11px;font-weight:700;cursor:pointer">✏️ Edit</button>':'')
+      +    (qs==='Draft'||qs==='Approved'?'<button onclick="event.stopPropagation();rejectQuote(\''+d.dealId+'\')" style="padding:4px 12px;border-radius:6px;background:#FEF2F2;border:1px solid #FECACA;color:#D63B3B;font-size:11px;font-weight:600;cursor:pointer">Reject</button>':'')
+      +  '</div>'
+      +'</div>'
+      +'</div>';
+  }).join('');
+}
+
+function openQuoteDetail(dealId) {
+  openDeal(dealId);
+  // After opening, update the OF button states
+  setTimeout(function(){
+    var d = deals.find(function(x){ return x.dealId===dealId; });
+    if(d) { state.quoteStatus = d.quoteStatus||'Draft'; updateOFButtons(); }
+  }, 300);
+}
+
+// ── Override renderOrderForm to show quote status bar ────────────
+var _origBuildPane7 = buildPane7;
+buildPane7 = function() {
+  _origBuildPane7();
+  // Update button states after render
+  setTimeout(updateOFButtons, 50);
+  // Inject quote status bar above the actions
+  var actionsEl = document.querySelector('.of-actions');
+  if(actionsEl && (state.quoteStatus || state.sfdcOppId)) {
+    var qs = state.quoteStatus||'Draft';
+    var qc = QUOTE_STATUS_COLOR[qs]||'#8896AA';
+    var qi = QUOTE_STATUS_ICON[qs]||'📝';
+    var statusBar = document.createElement('div');
+    statusBar.style.cssText = 'padding:10px 14px;background:'+qc+'11;border:1px solid '+qc+'33;border-radius:8px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between';
+    statusBar.innerHTML = '<div style="display:flex;align-items:center;gap:10px">'
+      +'<span style="font-size:16px">'+qi+'</span>'
+      +'<div>'
+      +  '<div style="font-size:12px;font-weight:700;color:'+qc+'">Quote Status: '+qs+'</div>'
+      +  (state.sfdcOppId?'<div style="font-size:10px;color:var(--faint);font-family:var(--mono)">SFDC Opp: '+escHtml(state.sfdcOppId)+'</div>':'')
+      +  (state.parentContractId?'<div style="font-size:10px;color:var(--faint)">Parent Contract: '+escHtml(state.parentContractId)+'</div>':'')
+      +'</div></div>'
+      +'<div style="display:flex;gap:6px">'
+      +  QUOTE_STATUS_ORDER.filter(function(s){ return s!=='Contracted'; }).map(function(s){
+           var active = s===qs;
+           return '<div style="padding:3px 9px;border-radius:8px;font-size:10px;font-weight:700;background:'
+             +(active?qc:'var(--border)')+';color:'+(active?'#fff':'var(--faint)')+'">'+s+'</div>';
+         }).join('<span style="color:var(--border);font-size:10px;align-self:center">›</span>')
+      +'</div>';
+    actionsEl.parentNode.insertBefore(statusBar, actionsEl);
+  }
+};
 
 </script>
 </body>

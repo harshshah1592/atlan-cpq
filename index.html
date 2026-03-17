@@ -262,7 +262,8 @@ textarea{resize:vertical;min-height:60px}
 .of-actions{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
 .btn-primary{padding:8px 16px;background:var(--blue);color:#fff;border:none;border-radius:var(--rs);font-size:12px;font-weight:600;display:flex;align-items:center;gap:5px}
 .btn-secondary{padding:8px 16px;background:#fff;color:var(--text);border:1px solid var(--border);border-radius:var(--rs);font-size:12px;font-weight:600}
-.of-doc{background:#fff;border:1px solid var(--border);border-radius:var(--r);padding:32px;font-family:Arial,sans-serif;font-size:12px;color:#000;max-width:800px;margin:0 auto}
+.of-doc{background:#fff;border:1px solid var(--border);border-radius:var(--r);padding:32px;font-family:Arial,sans-serif;font-size:12px;color:#000;max-width:800px;margin:0 auto;position:relative}
+.of-watermark{position:absolute;top:0;left:0;right:0;bottom:0;pointer-events:none;z-index:5;display:flex;align-items:center;justify-content:center;overflow:hidden}
 .of-hdr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:22px;padding-bottom:16px;border-bottom:3px solid #0B1829}
 .of-tbl{width:100%;border-collapse:collapse;margin-bottom:18px}
 .of-tbl th{background:#0B1829;color:#fff;padding:8px 10px;font-size:11px;text-align:left}
@@ -637,39 +638,64 @@ textarea{resize:vertical;min-height:60px}
 
   <!-- ── APPROVAL MATRIX VIEW ─────────────────────────── -->
   <div class="view" id="view-approval-matrix">
+    <!-- Commercial discount tiers -->
     <div class="card">
       <div class="card-title">
         <div class="step-chip" style="background:var(--green)">✓</div>
         <div>
-          <div class="card-title-text">Approval Matrix</div>
-          <div class="card-title-sub">Edit thresholds — changes apply immediately to all new deals</div>
+          <div class="card-title-text">Approval Matrix — Commercial Discounts</div>
+          <div class="card-title-sub">Add or remove tiers · Edit thresholds · Changes apply immediately to all new deals</div>
         </div>
-        <button class="btn-primary" onclick="saveMatrix()" style="margin-left:auto">Save Changes</button>
+        <div style="display:flex;gap:8px;margin-left:auto">
+          <button onclick="addMatrixTier()" style="padding:6px 14px;border-radius:var(--rs);font-size:11px;font-weight:700;cursor:pointer;border:1px solid var(--blue);color:var(--blue);background:#fff">+ Add Tier</button>
+          <button class="btn-primary" onclick="saveMatrix()">Save Changes</button>
+        </div>
       </div>
-      <!-- Visual tier bands -->
       <div id="matrixVisualBands" style="display:flex;gap:0;border-radius:8px;overflow:hidden;margin-bottom:18px;border:1px solid var(--border)"></div>
       <table class="matrix-table" id="matrixTable">
-        <thead><tr>
-          <th>#</th><th>Level</th><th>Approver / Role</th>
-          <th>Discount Up To (%)</th><th>Color</th>
-        </tr></thead>
+        <thead><tr><th>#</th><th>Level</th><th>Approver / Role</th><th>Discount Up To (%)</th><th>Color</th><th></th></tr></thead>
         <tbody id="matrixBody"></tbody>
       </table>
       <div style="margin-top:14px;padding:12px;background:#FFF8E1;border:1px solid #FFE082;border-radius:var(--rs);font-size:12px;color:#B45309">
-        ⚠️ Changes to the approval matrix affect all new deals immediately. Deals already in progress use the thresholds active at time of creation.
+        ⚠️ Changes affect all new deals immediately. In-progress deals use thresholds from time of creation.
       </div>
     </div>
+    <!-- Services thresholds -->
     <div class="card">
       <div class="card-title">
         <div class="step-chip" style="background:var(--teal)">📋</div>
         <div><div class="card-title-text">Services Approval Thresholds</div>
-          <div class="card-title-sub">Max discount % by deal type before escalation required — editable</div>
+          <div class="card-title-sub">Max discount % by deal type before escalation required</div>
         </div>
       </div>
       <table class="matrix-table" id="svcMatrixTable">
         <thead><tr><th>Service</th><th>Deal Type</th><th>Rep Max %</th><th>RSD Max %</th><th>BAM Max %</th></tr></thead>
         <tbody id="svcMatrixBody"></tbody>
       </table>
+    </div>
+    <!-- Non-Standard Terms -->
+    <div class="card">
+      <div class="card-title">
+        <div class="step-chip" style="background:#7B2FBE">⚖</div>
+        <div>
+          <div class="card-title-text">Non-Standard Commercial Terms</div>
+          <div class="card-title-sub">Configurable terms that require separate approvals · Appear as checkboxes in each deal's Approval step</div>
+        </div>
+        <div style="display:flex;gap:8px;margin-left:auto">
+          <button onclick="addNSTTerm()" style="padding:6px 14px;border-radius:var(--rs);font-size:11px;font-weight:700;cursor:pointer;border:1px solid #7B2FBE;color:#7B2FBE;background:#fff">+ Add Term</button>
+          <button onclick="saveNSTMatrix(event)" style="padding:6px 14px;border-radius:var(--rs);font-size:11px;font-weight:700;cursor:pointer;border:none;background:#7B2FBE;color:#fff">Save Changes</button>
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:14px;padding:10px 14px;background:#F5F3FF;border:1px solid #DDD6FE;border-radius:var(--rs)">
+        💡 When a rep checks one of these terms in their deal, the specified approver must approve it separately from the discount approval.
+      </div>
+      <table class="matrix-table" id="nstMatrixTable">
+        <thead><tr><th>#</th><th>Term Label</th><th>Description / Hint</th><th>Approver Required</th><th>Color</th><th></th></tr></thead>
+        <tbody id="nstMatrixBody"></tbody>
+      </table>
+      <div style="margin-top:14px;padding:12px;background:#FFF8E1;border:1px solid #FFE082;border-radius:var(--rs);font-size:12px;color:#B45309">
+        ⚠️ Removing a term here does not retroactively affect deals already in progress.
+      </div>
     </div>
   </div>
 
@@ -1799,6 +1825,17 @@ function loadMatrix(){
 }
 function saveMatrixToStorage(tiers){ localStorage.setItem('atlan_cpq_matrix',JSON.stringify(tiers)); }
 
+// ── Non-Standard Terms (NST) — configurable from Approval Matrix page ──
+const NST_STORAGE_KEY='atlan_cpq_nst_terms';
+const DEFAULT_NST_TERMS=[
+  {key:'rmv_mkt',   label:'Remove Marketing / Logo Terms',   hint:'Removes Ambassador Program language from OF', approver:'BAM + Jim (CRO)',          color:'#7B2FBE'},
+  {key:'rmv_renew', label:'Remove Auto-Renewal',             hint:'Applies manual renewal language to OF',       approver:'Jim (CRO)',                  color:'#D63B3B'},
+  {key:'rmv_uplift',label:'Remove Price Uplift / Escalation',hint:'Removes Annual Subscription Fees Escalation',approver:'BAM / Sales Leadership',      color:'#E89B00'},
+];
+function loadNSTTerms(){ try{return JSON.parse(localStorage.getItem(NST_STORAGE_KEY)||'null')||JSON.parse(JSON.stringify(DEFAULT_NST_TERMS));}catch(e){return JSON.parse(JSON.stringify(DEFAULT_NST_TERMS));}}
+function saveNSTTerms(t){ localStorage.setItem(NST_STORAGE_KEY,JSON.stringify(t)); }
+let NST_TERMS=loadNSTTerms();
+
 let deals = loadDeals();
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1832,6 +1869,7 @@ function freshState(){
     renewalType:'auto',renewalDays:30,uplift:7,ambassador:true,optOut:false,optOutDays:'',
     mktTerms:'',notes:'',apprComments:'',
     discReason:'',nonStdTerms:'',
+    isAMAP:false,
     createdAt:new Date().toISOString(),
     quoteStatus:'Draft',
     sfdcOppId:'',
@@ -2088,9 +2126,11 @@ function calcPlatformPrice(){
   if(!tier||!assets){el('assetCalcResult').textContent='Select tier and enter asset volume';el('platformPriceBreakdown')?.classList.add('hidden');return;}
   const{list,target,breakdown}=calcPlatformPriceForTier(tier,assets);
   state.platformList=list;
-  if(!state.platformNet) state.platformNet=target;
-  el('f_platNet').value=state.platformNet;
-  el('f_platDisc').value=discPct(list,state.platformNet).toFixed(1);
+  // Rep enters net price manually — no target auto-fill
+  if(el('f_platNet') && !state.platformNet) el('f_platNet').value='';
+  if(el('f_platDisc') && !state.platformDisc) el('f_platDisc').value='';
+  if(state.platformNet && el('f_platNet')) el('f_platNet').value=state.platformNet;
+  if(state.platformDisc && el('f_platDisc')) el('f_platDisc').value=state.platformDisc.toFixed(1);
   el('platformListDisplay').textContent=fmt(list);
   // ── Upsell tier-change credit ──
   var upCreditHtml = '';
@@ -2123,7 +2163,7 @@ function calcPlatformPrice(){
       }
     }
   }
-  el('assetCalcResult').textContent = 'List: ' + fmt(list) + ' · Target: ' + fmt(target) + ' · Current: ' + fmt(state.platformNet);
+  el('assetCalcResult').textContent = 'List: ' + fmt(list) + (state.platformNet ? ' · Net: ' + fmt(state.platformNet) : ' · Enter net price below');
   el('platformPriceBreakdown')?.classList.remove('hidden');
   var html = '<div style="font-size:10px;font-weight:700;color:var(--muted);margin-bottom:6px">Price Breakdown — ' + tier + '</div>';
   breakdown.forEach(function(b){ html += '<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid var(--border);font-size:11px"><span style="color:var(--muted)">'+b.label+'</span><span style="font-family:var(--mono)">'+fmt(b.listAmt)+' list / '+fmt(b.targetAmt)+' target</span></div>'; });
@@ -2246,8 +2286,8 @@ function updateUser(i,field,val){
     const sp=getSeatPrice(u.type,u.qty);
     u.band=sp.label;u.listPPM=sp.list;u.targetPPM=sp.target;
     u.annualList=Math.round(sp.list*u.qty*12*pf);
-    u.net=Math.round(sp.target*u.qty*12*pf);
-    u.disc=discPct(u.annualList,u.net);
+    // No auto-fill — rep sets net price manually
+    if(!u.net){u.net=0;u.disc=0;} else {u.disc=discPct(u.annualList,u.net);}
   } else if(field==='net'){u.net=parseFloat(val)||0;u.disc=discPct(u.annualList,u.net);}
   else if(field==='disc'){u.disc=parseFloat(val)||0;u.net=Math.round(u.annualList*(1-u.disc/100));}
   refreshUserReadonlyCells();updateAddonsList();updateSummaryStats();
@@ -2298,8 +2338,9 @@ function updateAddonsList(){
     const targetPrice=Math.round(rawTarget*pf);
 
     if(!existing||!ad.manualOverride){
-      // No manual override — auto-fill both net and disc from target price
-      ad.list=listPrice; ad.net=targetPrice; ad.disc=discPct(listPrice,targetPrice);
+      // No manual override — update list but keep net blank unless rep set it
+      ad.list=listPrice;
+      if(!ad.net){ad.net=0;ad.disc=0;} else {ad.disc=discPct(listPrice,ad.net);}
     } else {
       // Rep has manually set a net price — preserve their net, just update list and recalc disc
       ad.list=listPrice;
@@ -2643,10 +2684,14 @@ function renderSummaryStep(){
 // ═══════════════════════════════════════════════════════════════════
 // Approval: only the single highest required approver needs to sign off
 function getHighestApprover(disc){
-  // Walk tiers in reverse to find the highest one needed
+  // AMAP override: always route to Jim (CRO) regardless of discount %
+  if(state.isAMAP){
+    const cro=APPROVAL_TIERS.find(t=>t.approver&&(t.approver.toLowerCase().includes('jim')||t.approver.toLowerCase().includes('cro')));
+    return cro||APPROVAL_TIERS[Math.min(3,APPROVAL_TIERS.length-1)];
+  }
   const tier=getTier(disc);
-  if(disc<=15) return null; // self-approved, no approver row needed
-  return tier; // single highest approver
+  if(disc<=15) return null;
+  return tier;
 }
 
 // Non-standard terms: auto-detect from quote fields + manual overrides
@@ -2659,12 +2704,11 @@ function getNonStdTerms(){
   const isOptOut=el('f_optOut')?.checked??state.optOut??false;
   if(isOptOut) terms.push({key:'optout',label:'Opt-Out Clause',approver:'Included in deal terms',color:'#009DB5',auto:true,hint:`Opt-out period: ${v('f_optOutDays')||state.optOutDays||'x'} days`});
   const renewalType=v('f_renewalType')||state.renewalType||'auto';
-  // Manual non-standard selections:
+  // Manual non-standard selections — driven by configurable NST_TERMS:
   const manual=state.nonStdManual||[];
   manual.forEach(k=>{
-    if(k==='rmv_mkt')    terms.push({key:'rmv_mkt',   label:'Remove Marketing / Logo Terms',approver:'BAM + Jim (CRO)',color:'#D63B3B',auto:false,hint:'Ambassador & reference language removed from OF'});
-    if(k==='rmv_renew')  terms.push({key:'rmv_renew', label:'Remove Auto-Renewal',           approver:'Jim (CRO)',    color:'#7B2FBE',auto:false,hint:'Manual renewal language applied to OF'});
-    if(k==='rmv_uplift') terms.push({key:'rmv_uplift',label:'Remove Price Uplift',            approver:'BAM / Sales Leadership',color:'#D63B3B',auto:false,hint:'Annual fees escalation row removed from OF'});
+    const nst=NST_TERMS.find(t=>t.key===k);
+    if(nst) terms.push({key:nst.key,label:nst.label,approver:nst.approver,color:nst.color,auto:false,hint:nst.hint||''});
   });
   return terms;
 }
@@ -2676,11 +2720,16 @@ function renderApprovalStep(){
   const nonStd=getNonStdTerms();
 
   // Banner
-  if(el('approvalBanner'))el('approvalBanner').innerHTML=`<div class="tier-banner" style="background:${tier.color}11;border:1px solid ${tier.color}33;margin-bottom:14px">
+  const amapBannerHtml = state.isAMAP ? `<div style="margin-bottom:12px;padding:10px 14px;background:#FFF8E1;border:1.5px solid #FCD34D;border-radius:var(--rs);display:flex;align-items:center;gap:10px">
+    <span style="font-size:20px">🌏</span>
+    <div><div style="font-size:12px;font-weight:700;color:#92400E">AMAP Deal — Approval Override Active</div>
+    <div style="font-size:11px;color:#78350F;margin-top:2px">Standard discount matrix bypassed. Routing to <strong>Jim (CRO)</strong> regardless of discount %.</div></div>
+  </div>` : '';
+  if(el('approvalBanner'))el('approvalBanner').innerHTML=amapBannerHtml+`<div class="tier-banner" style="background:${tier.color}11;border:1px solid ${tier.color}33;margin-bottom:14px">
     <div style="width:36px;height:36px;border-radius:50%;background:${tier.color};display:grid;place-items:center;font-size:16px;color:#fff;flex-shrink:0">${tier.icon}</div>
-    <div><div style="font-weight:700;color:${tier.color}">${tier.label} — ${pct(disc)}</div>
-      <div style="font-size:11px;color:var(--muted)">Required: <strong>${tier.approver}</strong></div></div>
-    <div style="margin-left:auto;text-align:right;font-size:11px;color:var(--muted)">Only highest approver required</div>
+    <div><div style="font-weight:700;color:${tier.color}">${state.isAMAP?'AMAP Override: CRO Approval Required':tier.label+' — '+pct(disc)}</div>
+      <div style="font-size:11px;color:var(--muted)">Required: <strong>${state.isAMAP?'Jim (CRO)':tier.approver}</strong></div></div>
+    <div style="margin-left:auto;text-align:right;font-size:11px;color:var(--muted)">${state.isAMAP?'AMAP override active':'Only highest approver required'}</div>
   </div>`;
 
   // Flow bar — rep → (highest approver only) → approved
@@ -2721,11 +2770,7 @@ function renderApprovalStep(){
   }
 
   // Non-standard terms section with per-item approval rows
-  const manualOpts=[
-    {key:'rmv_mkt',   label:'Remove Marketing / Logo Terms',   hint:'Removes Ambassador Program language from OF', approver:'BAM + Jim (CRO)', color:'#7B2FBE'},
-    {key:'rmv_renew', label:'Remove Auto-Renewal',             hint:'Applies manual renewal language to OF',       approver:'Jim (CRO)',         color:'#D63B3B'},
-    {key:'rmv_uplift',label:'Remove Price Uplift / Escalation',hint:'Removes Annual Subscription Fees Escalation from OF', approver:'BAM / Sales Leadership', color:'#D63B3B'},
-  ];
+  const manualOpts=NST_TERMS; // driven by configurable NST_TERMS
   const manual=state.nonStdManual||[];
   let nstHtml=`<div style="margin-top:14px;padding:14px;background:#F8FAFC;border:1px solid var(--border);border-radius:var(--rs)">
     <div style="font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin-bottom:10px">Non-Standard Commercial Terms</div>
@@ -2877,6 +2922,30 @@ function getGoverningTermsTable(){
 // ═══════════════════════════════════════════════════════════════════
 // ORDER FORM RENDER
 // ═══════════════════════════════════════════════════════════════════
+function applyWatermark(){
+  const doc = el('ofDoc');
+  if(!doc) return;
+  const existing = doc.querySelector('.of-watermark');
+  if(existing) existing.remove();
+  const isApproved = doc.innerHTML.includes('✓ APPROVED') || doc.innerHTML.includes("'APPROVED'");
+  // Check via state instead — more reliable
+  const{disc}=getTotals();
+  const approved=disc===0||disc<=15||Object.values(state.approvals||{}).some(a=>a&&a.status==='approved');
+  if(!approved){
+    const wm = document.createElement('div');
+    wm.className = 'of-watermark';
+    wm.style.cssText = 'position:absolute;top:0;left:0;right:0;bottom:0;pointer-events:none;z-index:5;display:flex;align-items:center;justify-content:center;overflow:hidden';
+    wm.innerHTML = '<div style="transform:rotate(-38deg);font-size:72px;font-weight:900;color:#0B1829;opacity:0.055;white-space:nowrap;user-select:none;letter-spacing:6px;text-align:center;line-height:1.4">DRAFT<br/>PENDING<br/>DRAFT</div>';
+    doc.style.position = 'relative';
+    doc.appendChild(wm);
+  } else {
+    doc.style.position = '';
+  }
+}
+
+const ATLAN_LOGO_B64="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";
+const ATLAN_LOGO_SRC="data:image/png;base64,"+ATLAN_LOGO_B64;
+
 function renderOrderForm(){
   const{totalList,totalNet,disc,items}=getTotals();
   const cur=(v('f_currency')||state.currency)||'USD';
@@ -2923,8 +2992,8 @@ function renderOrderForm(){
   if(el('ofDoc')) el('ofDoc').innerHTML=`
     <div class="of-hdr">
       <div>
-        <div style="font-size:22px;font-weight:700;color:#0B1829;letter-spacing:-.5px">atlan</div>
-        <div style="font-size:9px;color:#666;letter-spacing:1.2px;margin-top:2px">ORDER FORM</div>
+        <img src="${ATLAN_LOGO_SRC}" alt="Atlan" style="height:30px;margin-bottom:4px;display:block"/>
+        <div style="font-size:9px;color:#666;letter-spacing:1.2px;margin-top:2px;text-transform:uppercase;font-weight:600">Order Form</div>
         <div style="margin-top:5px;padding:2px 9px;border-radius:4px;display:inline-block;font-size:10px;font-weight:700;background:${dtColor}22;border:1px solid ${dtColor}55;color:${dtColor}">${dtLabel}</div>
         ${state.dealType==='UP'&&pf<1?('<div style="margin-top:3px;padding:2px 8px;border-radius:4px;display:inline-block;font-size:9px;font-weight:700;background:#FFF8E1;border:1px solid #FFE082;color:#B45309;margin-left:4px">Pro-rated '+((pf*100).toFixed(0))+'%</div>'):''}
       </div>
@@ -2933,7 +3002,8 @@ function renderOrderForm(){
         ${sfdcId?'SFDC Opp: <strong style="font-family:monospace">'+sfdcId+'</strong><br/>':''}
         ${state.renewalFromDealId?'Renewal of: <strong>'+state.renewalFromDealId+'</strong><br/>':''}
         Start: <strong>${startDate}</strong> · Term: <strong>${termMonths} months</strong><br/>
-        <div style="margin-top:4px;padding:3px 9px;border-radius:4px;display:inline-block;font-size:9px;font-weight:700;background:${isApproved?'#E8F5E9':'#FFF8E1'};border:1px solid ${isApproved?'#A5D6A7':'#FFE082'};color:${isApproved?'#2E7D32':'#F57F17'}">${isApproved?'APPROVED':'DRAFT — PENDING APPROVAL'}</div>
+        <div style="margin-top:4px;padding:4px 10px;border-radius:4px;display:inline-block;font-size:9px;font-weight:700;background:${isApproved?'#DCFCE7':'#FEF2F2'};border:1.5px solid ${isApproved?'#86EFAC':'#FECACA'};color:${isApproved?'#15803D':'#DC2626'}">${isApproved?'✓ APPROVED':'⚠ DRAFT — PENDING APPROVAL'}</div>
+        ${state.isAMAP?'<div style="margin-top:3px;padding:3px 9px;border-radius:4px;display:inline-block;font-size:9px;font-weight:700;background:#FFF8E1;border:1px solid #FCD34D;color:#92400E">🌏 AMAP Deal</div>':''}
       </div>
     </div>
     <table class="of-parties"><tr>
@@ -2971,10 +3041,15 @@ function renderOrderForm(){
         <div style="line-height:2.4;color:#333;font-size:10px">Signature: ___________________<br/>Name: ___________________<br/>Designation: ___________________<br/>Date: ___________________</div></td>
     </tr></table>
     <div style="text-align:center;font-size:9px;color:#999;margin-top:16px">Private and Confidential — Atlan Technologies</div>`;
+  applyWatermark();
 }
 
 function printOF(){
+  // Temporarily remove watermark for clean print
+  const wm = el('ofDoc') && el('ofDoc').querySelector('.of-watermark');
+  if(wm) wm.style.display='none';
   const content=el('ofDoc').innerHTML;
+  if(wm) wm.style.display='';
   const w=window.open('','_blank');
   w.document.write(`<!DOCTYPE html><html><head><title>Atlan Order Form — ${state.legal||'Draft'}</title><style>body{margin:15mm;font-family:Arial,sans-serif;font-size:11px;color:#000}table{border-collapse:collapse;width:100%}@page{margin:12mm}
 /* ── CONTRACT CARDS ───────────────────────────────────── */
@@ -3227,9 +3302,9 @@ function renderApprovalMatrix(){
   }).join('');
 
   if(el('matrixBody')) el('matrixBody').innerHTML=APPROVAL_TIERS.map((t,i)=>`<tr>
-    <td>${i+1}</td>
-    <td><input class="matrix-name-input" value="${t.label}" onchange="updateMatrixRow(${i},'label',this.value);renderApprovalMatrix()"/></td>
-    <td><input class="matrix-name-input" value="${t.approver}" onchange="updateMatrixRow(${i},'approver',this.value)"/></td>
+    <td style="color:var(--faint);font-size:11px">${i+1}</td>
+    <td><input class="matrix-name-input" value="${escHtml(t.label)}" onchange="updateMatrixRow(${i},'label',this.value);renderApprovalMatrix()"/></td>
+    <td><input class="matrix-name-input" value="${escHtml(t.approver)}" onchange="updateMatrixRow(${i},'approver',this.value)" style="width:220px"/></td>
     <td><div style="display:flex;align-items:center;gap:5px">
       <input class="matrix-editable" type="number" min="0" max="100" value="${t.max}" onchange="updateMatrixRow(${i},'max',this.value);renderApprovalMatrix()"/>
       <span style="font-size:11px;color:var(--faint)">%</span>
@@ -3238,6 +3313,10 @@ function renderApprovalMatrix(){
       <input type="color" value="${t.color}" onchange="updateMatrixRow(${i},'color',this.value);renderApprovalMatrix()" style="width:36px;height:28px;padding:2px;border:1px solid var(--border);border-radius:4px;cursor:pointer"/>
       <span style="width:14px;height:14px;border-radius:3px;display:inline-block;background:${t.color}"></span>
     </div></td>
+    <td>${APPROVAL_TIERS.length>1
+      ? `<button onclick="removeMatrixTier(${i})" style="padding:3px 9px;border-radius:var(--rs);font-size:11px;cursor:pointer;border:1px solid #FECACA;color:#D63B3B;background:#FEF2F2">✕</button>`
+      : '<span style="font-size:10px;color:var(--faint)">min 1</span>'
+    }</td>
   </tr>`).join('');
 
   if(el('svcMatrixBody')) el('svcMatrixBody').innerHTML=SERVICES.map((s,si)=>`
@@ -3251,6 +3330,50 @@ function renderApprovalMatrix(){
       <td><div style="display:flex;align-items:center;gap:4px"><input class="matrix-editable" type="number" min="0" max="100" value="${+(s.rsdMax*100).toFixed(0)}" onchange="updateSvcMatrix(${si},'rsdMax',this.value/100)" style="width:55px"/> <span style="font-size:11px;color:var(--faint)">%</span></div></td>
       <td><div style="display:flex;align-items:center;gap:4px"><input class="matrix-editable" type="number" min="0" max="100" value="${+(s.bamMax*100).toFixed(0)}" onchange="updateSvcMatrix(${si},'bamMax',this.value/100)" style="width:55px"/> <span style="font-size:11px;color:var(--faint)">%</span></div></td>
     </tr>`).join('');
+
+  // ── NST table ──────────────────────────────────────────────────────
+  if(el('nstMatrixBody')) el('nstMatrixBody').innerHTML = NST_TERMS.length
+    ? NST_TERMS.map((t,i)=>`<tr>
+        <td style="color:var(--faint);font-size:11px">${i+1}</td>
+        <td><input class="matrix-name-input" value="${escHtml(t.label)}" onchange="NST_TERMS[${i}].label=this.value" style="width:190px"/></td>
+        <td><input class="matrix-name-input" value="${escHtml(t.hint||'')}" onchange="NST_TERMS[${i}].hint=this.value" style="width:240px;font-size:11px;color:var(--muted)"/></td>
+        <td><input class="matrix-name-input" value="${escHtml(t.approver)}" onchange="NST_TERMS[${i}].approver=this.value" style="width:180px"/></td>
+        <td><div style="display:flex;align-items:center;gap:7px">
+          <input type="color" value="${t.color||'#D63B3B'}" onchange="NST_TERMS[${i}].color=this.value;renderApprovalMatrix()" style="width:36px;height:28px;padding:2px;border:1px solid var(--border);border-radius:4px;cursor:pointer"/>
+          <span style="width:14px;height:14px;border-radius:3px;display:inline-block;background:${t.color||'#D63B3B'}"></span>
+        </div></td>
+        <td><button onclick="removeNSTTerm(${i})" style="padding:3px 9px;border-radius:var(--rs);font-size:11px;cursor:pointer;border:1px solid #FECACA;color:#D63B3B;background:#FEF2F2">✕</button></td>
+      </tr>`).join('')
+    : '<tr><td colspan="6" style="text-align:center;color:var(--faint);padding:16px;font-size:12px">No non-standard terms configured. Click + Add Term to create one.</td></tr>';
+}
+function updateMatrixRow(i,field,val){
+  if(field==='max') APPROVAL_TIERS[i].max=parseFloat(val)||0;
+  else APPROVAL_TIERS[i][field]=val;
+}
+function addMatrixTier(){
+  APPROVAL_TIERS.push({max:100,label:'New Level',approver:'Approver Name',color:'#8896AA',icon:'◆',range:''});
+  renderApprovalMatrix();
+}
+function removeMatrixTier(i){
+  if(APPROVAL_TIERS.length<=1){alert('Cannot remove the last approval tier.');return;}
+  if(!confirm('Remove tier "'+APPROVAL_TIERS[i].label+'"?')) return;
+  APPROVAL_TIERS.splice(i,1);
+  renderApprovalMatrix();
+}
+function addNSTTerm(){
+  NST_TERMS.push({key:'nst_'+Date.now(),label:'New Term',hint:'Describe when this applies',approver:'Approver Name',color:'#7B2FBE'});
+  renderApprovalMatrix();
+}
+function removeNSTTerm(i){
+  if(!confirm('Remove "'+NST_TERMS[i].label+'"?')) return;
+  NST_TERMS.splice(i,1);
+  saveNSTTerms(NST_TERMS);
+  renderApprovalMatrix();
+}
+function saveNSTMatrix(ev){
+  saveNSTTerms(NST_TERMS);
+  const btn=ev?ev.target:document.querySelector('[onclick*="saveNSTMatrix"]');
+  if(btn){const orig=btn.textContent;btn.textContent='✓ Saved!';btn.style.background='#00B87A';setTimeout(()=>{btn.textContent=orig;btn.style.background='#7B2FBE';},2000);}
 }
 function updateMatrixRow(i,field,val){
   if(field==='max') APPROVAL_TIERS[i].max=parseFloat(val)||0;
@@ -3341,6 +3464,16 @@ function buildPane0(){
       <div class="field" style="margin-bottom:12px">
         <label class="lbl">Rep Name</label>
         <input type="text" id="f_repName" value="${state.repName||''}" placeholder="Your name"/>
+      </div>
+      <div style="margin-bottom:14px;padding:11px 14px;border-radius:var(--rs);border:1.5px solid ${state.isAMAP?'#D97706':'var(--border)'};background:${state.isAMAP?'#FFFBEB':'#F8FAFC'};transition:all .2s">
+        <div style="display:flex;align-items:center;gap:8px">
+          <input type="checkbox" id="f_isAMAP" ${state.isAMAP?'checked':''} onchange="toggleAMAP(this.checked)" style="width:16px;height:16px;accent-color:#D97706;cursor:pointer;flex-shrink:0"/>
+          <label for="f_isAMAP" style="font-size:13px;font-weight:600;cursor:pointer;color:${state.isAMAP?'#92400E':'var(--text)'}">🌏 AMAP Deal</label>
+          ${state.isAMAP?'<span style=\'margin-left:auto;font-size:10px;padding:2px 9px;border-radius:20px;background:#D97706;color:#fff;font-weight:700\'>Override Active</span>':''}
+        </div>
+        <div style="font-size:11px;color:${state.isAMAP?'#92400E':'var(--faint)'};margin-top:5px;margin-left:24px;line-height:1.5">
+          ${state.isAMAP?'⚠ Approval routes directly to <strong>Jim (CRO)</strong>, bypassing standard discount matrix':'Check for Asia-Pacific deals with first-year discount — bypasses standard matrix, routes to Jim (CRO)'}
+        </div>
       </div>
       <div class="sub-lbl">Company Details</div>
       <div class="g2">
@@ -3455,10 +3588,10 @@ function buildPane1(){
       <div class="g3">
         <div class="field"><label class="lbl">List Price</label>
           <div style="padding:7px 10px;background:#F8FAFC;border:1px solid var(--border);border-radius:var(--rs);font-family:var(--mono);font-size:13px;font-weight:700" id="platformListDisplay">${state.platformList?fmt(state.platformList):'—'}</div></div>
-        <div class="field"><label class="lbl">Net / Target Price</label>
+        <div class="field"><label class="lbl">Net Price <span style="font-size:10px;color:var(--faint);font-weight:400">(your negotiated price)</span></label>
           <input type="number" id="f_platNet" value="${state.platformNet||''}" placeholder="Enter net price" onchange="syncPlatformFromNet()" onblur="syncPlatformFromNet()"/></div>
         <div class="field"><label class="lbl">Discount %</label>
-          <input type="number" id="f_platDisc" min="0" max="100" step="0.5" value="${state.platformDisc||''}" placeholder="e.g. 15" onchange="syncPlatformFromDisc()" onblur="syncPlatformFromDisc()"/></div>
+          <input type="number" id="f_platDisc" min="0" max="100" step="0.5" value="${state.platformDisc||''}" placeholder="e.g. 20" onchange="syncPlatformFromDisc()" onblur="syncPlatformFromDisc()"/></div>
       </div>
     </div>
     <div class="card">
@@ -3660,6 +3793,7 @@ function flushStateFromDOM(){
   if(el('f_mktTerms'))   state.mktTerms    = v('f_mktTerms')    || state.mktTerms;
   if(el('f_notes'))      state.notes       = v('f_notes')       || state.notes;
   if(el('f_repName'))    state.repName     = v('f_repName')      || state.repName;
+  if(el('f_isAMAP'))    state.isAMAP      = el('f_isAMAP').checked;
   if(el('f_discReason')) state.discReason  = v('f_discReason')  || state.discReason;
   if(el('f_apprComments'))state.apprComments=el('f_apprComments').value || state.apprComments;
 }
@@ -3676,6 +3810,11 @@ function stepNext(){
 
 function goStep(i){ flushStateFromDOM(); if(i<=step||i===step+1){step=i;renderCPQ();} }
 function stepBack(){ flushStateFromDOM(); if(step>0){step--;renderCPQ();} }
+function toggleAMAP(checked){
+  state.isAMAP=checked;
+  buildPane0(); // re-render to update banner styling
+  if(step===6) renderApprovalStep();
+}
 function togglePO(){ const req=el('f_poRequired')?.checked;el('poNumField')?.classList.toggle('hidden',!req); }
 function toggleRenewalFields(){ const isAuto=v('f_renewalType')==='auto';el('autoRenewalDaysField')?.classList.toggle('hidden',!isAuto); }
 function toggleOptOut(){ const checked=el('f_optOut')?.checked;el('optOutDaysField')?.classList.toggle('hidden',!checked); }

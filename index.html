@@ -3179,7 +3179,7 @@ function renderConnectors(){
       style="width:60px;padding:5px 7px;border:1px solid var(--border);border-radius:var(--rs);font-size:12px"/></div>
     <div style="font-family:var(--mono);font-size:11px;color:var(--muted)" id="connListTotal">${fmt(c.qty*Math.round(listPer*pf))}</div>
     <div style="display:grid;grid-template-columns:1fr auto;gap:5px;align-items:center">
-      <input type="number" value="${c.net||''}" placeholder="Net"
+      <input type="number" id="connNetInput" value="${c.net||''}" placeholder="Net"
         onchange="updateConnector('net',this.value)" onblur="updateConnector('net',this.value)"
         style="padding:5px 7px;border:1px solid var(--border);border-radius:var(--rs);font-size:11px"/>
       <div style="display:flex;align-items:center;gap:3px">
@@ -3197,7 +3197,7 @@ function updateConnector(field,val){
   const c=state.connectors;
   if(field==='qty'){c.qty=parseInt(val)||0;c.list=c.qty*listPer;if(!c.net)c.net=Math.round(c.list*(1-(c.disc||20)/100));if(el('connListTotal'))el('connListTotal').textContent=fmt(c.list);}
   else if(field==='net'){c.net=parseFloat(val)||0;c.disc=discPct(c.qty*listPer,c.net);}
-  else{c.disc=parseFloat(val)||0;c.net=Math.round(c.qty*listPer*(1-c.disc/100));}
+  else{c.disc=parseFloat(val)||0;c.net=Math.round(c.qty*listPer*(1-c.disc/100));if(el('connNetInput'))el('connNetInput').value=c.net;}
   updateSummaryStats();
 }
 
@@ -3443,6 +3443,74 @@ function renderSummaryStep(){
     <td class="mono">${fmt(totalList)}</td><td class="mono" style="color:var(--blue)">${fmt(totalNet)}</td>
     <td class="mono" style="color:var(--red)">${fmt(totalList-totalNet)}</td>
     <td>${badge(pct(disc),tier.color)}</td></tr>`;
+
+  // ── Auto Deal Desk flag logic ─────────────────────────────────────
+  // Triggers automatically based on deal characteristics
+  var ddReasons = [];
+  var svcItems = items.filter(function(i){ return i.cat==='Services'; });
+  var svcNet = svcItems.reduce(function(s,i){ return s+i.net; }, 0);
+  var subNet = totalNet - svcNet;
+  var termMonths = parseInt(state.termMonths)||12;
+  if(totalNet > 500000)       ddReasons.push('ACV >$500k');
+  if(termMonths > 36)         ddReasons.push('Term >3yr');
+  if(state.customSkus && state.customSkus.length > 0) ddReasons.push('Custom SKU');
+  if(subNet > 0 && svcNet/subNet > 0.30) ddReasons.push('PS >30% of subscription ACV');
+  if(state.isAMAP)            ddReasons.push('AMAP deal');
+
+  var autoDealDesk = ddReasons.length > 0;
+  if(autoDealDesk && !state.dealDeskFlag) {
+    state.dealDeskFlag = true;
+    state.dealDeskReason = ddReasons.join(', ');
+  }
+
+  // Render Deal Intelligence panel below the summary table
+  if(el('summaryDealIntel')) {
+    var discReasonOpts = ['Competitive pressure','Budget constraints','Strategic account','Expansion deal','Executive relationship','Other']
+      .map(function(r){ return '<option'+(r===state.discReason?' selected':'')+'>'+r+'</option>'; }).join('');
+    var competitorOpts = ['Salesforce','Alation','Ataccama','Collibra','Monte Carlo','Informatica','IBM','Other']
+      .map(function(c){ return '<option'+(c===state.competitor?' selected':'')+'>'+c+'</option>'; }).join('');
+
+    el('summaryDealIntel').innerHTML =
+      '<div class="sub-lbl" style="margin-top:20px">Deal Intelligence</div>'
+      +'<div class="g2" style="margin-top:8px">'
+        +'<div class="field">'
+          +'<label class="lbl">Competitive situation</label>'
+          +'<select id="f_competitor" onchange="state.competitor=this.value">'
+            +'<option value=""'+((!state.competitor)?' selected':'')+'>— No competitor (direct deal) —</option>'
+            +competitorOpts
+          +'</select>'
+          +'<div class="hint">Required when discount reason is Competitive pressure</div>'
+        +'</div>'
+        +'<div class="field">'
+          +'<label class="lbl">Discount reason<span class="req">*</span></label>'
+          +'<select id="f_discReason" onchange="state.discReason=this.value">'
+            +'<option value=""'+((!state.discReason)?' selected':'')+'>— Select reason —</option>'
+            +discReasonOpts
+          +'</select>'
+        +'</div>'
+        +(autoDealDesk
+          ? '<div class="field s2" style="grid-column:span 2">'
+              +'<div style="padding:10px 14px;background:#F5F3FF;border:1px solid #DDD6FE;border-radius:8px;font-size:12px;color:#5B21B6">'
+                +'<strong>🏦 Deal Desk auto-flagged</strong> — '
+                +ddReasons.join(' · ')
+                +'<div style="font-size:11px;color:var(--muted);margin-top:4px">RevOps will be notified when you submit. You can add context below.</div>'
+              +'</div>'
+            +'</div>'
+          : '<div class="field s2" style="grid-column:span 2">'
+              +'<div class="checkbox-row" style="align-items:flex-start;gap:8px">'
+                +'<input type="checkbox" id="f_dealDesk" '+(state.dealDeskFlag?'checked':'')+' onchange="state.dealDeskFlag=this.checked" style="margin-top:3px"/>'
+                +'<div>'
+                  +'<label for="f_dealDesk" style="font-size:12px;font-weight:600;cursor:pointer">🏦 Flag for Deal Desk review</label>'
+                  +'<div style="font-size:10px;color:var(--faint);margin-top:2px">Use for: ACV >$500k, custom SKU, term >3yr, multi-entity, PS >30% ACV</div>'
+                +'</div>'
+              +'</div>'
+            +'</div>')
+        +'<div class="field s2" style="grid-column:span 2">'
+          +'<label class="lbl">Deal Desk notes / context</label>'
+          +'<input type="text" id="f_dealDeskReason" value="'+(state.dealDeskReason||'')+'" placeholder="e.g. Custom SKU + ACV >$500k" oninput="state.dealDeskReason=this.value"/>'
+        +'</div>'
+      +'</div>';
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -5816,42 +5884,6 @@ function buildPane0(){
           <label for="f_isAMAP">🌏 AMAP Discount</label>
         </div></div>
       </div>
-      <div class="sub-lbl">Deal Intelligence</div>
-      <div class="g2">
-        <div class="field">
-          <label class="lbl">Competitive situation</label>
-          <select id="f_competitor" onchange="state.competitor=this.value;renderApprovalStep()">
-            <option value=""${!state.competitor?' selected':''}>— No competitor (direct deal) —</option>
-            ${['Salesforce','Alation','Ataccama','Collibra','Monte Carlo','Informatica','IBM','Other'].map(function(c){return '<option'+(c===state.competitor?' selected':'')+'>'+c+'</option>';}).join('')}
-          </select>
-          <div class="hint">Required when discount reason is Competitive pressure</div>
-        </div>
-        <div class="field">
-          <label class="lbl">Discount reason</label>
-          <select id="f_discReason" onchange="state.discReason=this.value;checkCompetitorRequired()">
-            <option value=""${!state.discReason?' selected':''}>— Select reason —</option>
-            ${['Competitive pressure','Budget constraints','Strategic account','Expansion deal','Executive relationship','Other'].map(function(r){return '<option'+(r===state.discReason?' selected':'')+'>'+r+'</option>';}).join('')}
-          </select>
-        </div>
-        <div class="field" id="competitorRequiredWarning" style="display:${state.discReason==='Competitive pressure'&&!state.competitor?'block':'none'}">
-          <div style="padding:8px 12px;background:#FEF3C7;border:1px solid #F59E0B;border-radius:6px;font-size:11px;color:#92400E;font-weight:600">
-            ⚠ Competitor field is required when reason is "Competitive pressure"
-          </div>
-        </div>
-        <div class="field">
-          <div class="checkbox-row" style="align-items:flex-start;gap:8px">
-            <input type="checkbox" id="f_dealDesk" ${state.dealDeskFlag?'checked':''} onchange="state.dealDeskFlag=this.checked;toggleDealDesk(this.checked)" style="margin-top:3px"/>
-            <div>
-              <label for="f_dealDesk" style="font-size:12px;font-weight:600;cursor:pointer">🏦 Flag for Deal Desk review</label>
-              <div style="font-size:10px;color:var(--faint);margin-top:2px">Use for: ACV >$500k, custom SKU, term >3yr, multi-entity, PS >30% ACV</div>
-            </div>
-          </div>
-        </div>
-        <div class="field ${state.dealDeskFlag?'':'hidden'}" id="dealDeskReasonField">
-          <label class="lbl">Deal desk reason</label>
-          <input type="text" id="f_dealDeskReason" value="${state.dealDeskReason||''}" placeholder="e.g. Custom SKU + ACV >$500k" oninput="state.dealDeskReason=this.value"/>
-        </div>
-      </div>
       <div class="sub-lbl">Additional Terms</div>
       <div class="g2">
         <div class="field s2"><label class="lbl">Marketing & Reference Terms</label>
@@ -6158,6 +6190,7 @@ function buildPane5(){
         <tbody id="summaryBody"></tbody>
         <tfoot id="summaryFoot"></tfoot>
       </table></div>
+      <div id="summaryDealIntel"></div>
     </div>`;
   renderSummaryStep();
 }
@@ -6234,11 +6267,19 @@ function buildPane8(){
         <button id="btnAcceptQuote" onclick="acceptQuote()" style="padding:7px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:none;background:#6B4FA8;color:#fff">
           🤝 Accept Quote
         </button>
-
       </div>
     </div>
-    <div class="of-doc" id="ofDoc"></div>`;
+    <div class="of-doc" id="ofDoc8"></div>`;
+  // Temporarily swap ofDoc id so renderOrderForm targets pane8's element
+  var p6doc = document.getElementById('ofDoc');
+  if(p6doc) p6doc.id = 'ofDoc_p6_hidden';
+  var p8doc = document.getElementById('ofDoc8');
+  if(p8doc) p8doc.id = 'ofDoc';
   renderOrderForm();
+  // Restore ids
+  if(p8doc) p8doc.id = 'ofDoc8';
+  if(p6doc) p6doc.id = 'ofDoc';
+  setTimeout(updateOFButtons, 50);
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -7806,36 +7847,6 @@ function openQuoteDetail(dealId) {
 }
 
 // ── Override renderOrderForm to show quote status bar ────────────
-var _origBuildPane8 = buildPane8;
-buildPane8 = function() {
-  _origBuildPane8();
-  // Update button states after render
-  setTimeout(updateOFButtons, 50);
-  // Inject quote status bar above the actions
-  var actionsEl = document.querySelector('.of-actions');
-  if(actionsEl && (state.quoteStatus || state.sfdcOppId)) {
-    var qs = state.quoteStatus||'Draft';
-    var qc = QUOTE_STATUS_COLOR[qs]||'#8896AA';
-    var qi = QUOTE_STATUS_ICON[qs]||'📝';
-    var statusBar = document.createElement('div');
-    statusBar.style.cssText = 'padding:10px 14px;background:'+qc+'11;border:1px solid '+qc+'33;border-radius:8px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between';
-    statusBar.innerHTML = '<div style="display:flex;align-items:center;gap:10px">'
-      +'<span style="font-size:16px">'+qi+'</span>'
-      +'<div>'
-      +  '<div style="font-size:12px;font-weight:700;color:'+qc+'">Quote Status: '+qs+'</div>'
-      +  (state.sfdcOppId?'<div style="font-size:10px;color:var(--faint);font-family:var(--mono)">SFDC Opp: '+escHtml(state.sfdcOppId)+'</div>':'')
-      +  (state.parentContractId?'<div style="font-size:10px;color:var(--faint)">Parent Contract: '+escHtml(state.parentContractId)+'</div>':'')
-      +'</div></div>'
-      +'<div style="display:flex;gap:6px">'
-      +  QUOTE_STATUS_ORDER.map(function(s){
-           var active = s===qs;
-           return '<div style="padding:3px 9px;border-radius:8px;font-size:10px;font-weight:700;background:'
-             +(active?qc:'var(--border)')+';color:'+(active?'#fff':'var(--faint)')+'">'+s+'</div>';
-         }).join('<span style="color:var(--border);font-size:10px;align-self:center">›</span>')
-      +'</div>';
-    actionsEl.parentNode.insertBefore(statusBar, actionsEl);
-  }
-};
 
 </script>
 <!-- ── SFDC Auth Gate — full screen login wall ── -->

@@ -424,6 +424,33 @@ textarea{resize:vertical;min-height:60px}
 .cp-type-tabs{display:flex;gap:0;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:#F4F5F9}
 .cp-type-tab{flex:1;padding:8px 12px;text-align:center;font-size:12px;font-weight:600;cursor:pointer;color:var(--muted);transition:all .15s;border:none;background:transparent}
 .cp-type-tab.active{background:#fff;color:var(--blue);box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.fm-tab{padding:11px 18px;border:none;background:transparent;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;font-family:inherit}
+.fm-tab:hover{color:var(--text);background:var(--hover)}
+.fm-tab.active{color:#059669;border-bottom-color:#059669}
+.fm-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:16px}
+.fm-card-title{font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px;display:flex;align-items:center;gap:8px}
+.fm-card-sub{font-size:11.5px;color:var(--muted);margin-bottom:16px}
+.fm-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)}
+.fm-row:last-child{border-bottom:none}
+.fm-label{font-size:12px;font-weight:600;color:var(--text);min-width:200px;flex-shrink:0}
+.fm-label-sub{font-size:10.5px;color:var(--muted);font-weight:400}
+.fm-input{flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit;background:var(--bg);color:var(--text);outline:none;transition:border-color .15s}
+.fm-input:focus{border-color:#059669}
+.fm-input.fm-code{font-family:monospace;font-size:11.5px;background:#F8F9FA}
+.fm-badge{font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px}
+.fm-badge-all{background:#DCFCE7;color:#15803D}
+.fm-badge-team{background:#FEF3C7;color:#B45309}
+.fm-badge-own{background:#F1F5F9;color:#64748B}
+.fm-badge-admin{background:#EDE9FE;color:#6D28D9}
+.fm-tree-node{display:flex;align-items:flex-start;gap:0;margin:2px 0}
+.fm-tree-line{width:20px;flex-shrink:0;display:flex;align-items:center;justify-content:center;padding-top:10px;color:var(--border)}
+.fm-tree-item{flex:1;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:9px 12px;display:flex;align-items:center;gap:10px}
+.fm-tree-item.level-0{border-left:3px solid #EF4444}
+.fm-tree-item.level-1{border-left:3px solid #F59E0B}
+.fm-tree-item.level-2{border-left:3px solid #3B82F6}
+.fm-tree-item.level-3{border-left:3px solid #8B5CF6}
+.fm-tree-children{padding-left:28px;display:flex;flex-direction:column;gap:4px;margin-top:4px}
+.fm-scope-select{padding:4px 8px;border:1px solid var(--border);border-radius:5px;font-size:11px;font-family:inherit;background:var(--bg);color:var(--text);cursor:pointer}
 </style>
 </head>
 <body>
@@ -458,6 +485,10 @@ textarea{resize:vertical;min-height:60px}
   </div>
   <div class="sb-item" onclick="showView('pricing-admin')" id="nav-pricing-admin">
     <span class="sb-item-icon"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1.5" y="1.5" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.4"/><path d="M4.5 7h5M7 4.5v5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span>Pricing Config
+    <span style="margin-left:auto;font-size:8px;padding:1px 5px;border-radius:4px;background:rgba(49,84,196,.3);color:#6B8FFF;font-weight:700">ADMIN</span>
+  </div>
+  <div class="sb-item" onclick="showView('field-mapping')" id="nav-field-mapping">
+    <span class="sb-item-icon"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1.5 4h4m0 0v6m0-6h2m3-2.5v2.5m0 0h-3m3 0v6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><rect x="8" y="7.5" width="4.5" height="3" rx="1" stroke="currentColor" stroke-width="1.2"/><rect x="1.5" y="7.5" width="4" height="3" rx="1" stroke="currentColor" stroke-width="1.2"/></svg></span>Field Mapping
     <span style="margin-left:auto;font-size:8px;padding:1px 5px;border-radius:4px;background:rgba(49,84,196,.3);color:#6B8FFF;font-weight:700">ADMIN</span>
   </div>
   <div class="sb-item" onclick="showView('sfdc-settings')" id="nav-sfdc-settings">
@@ -702,6 +733,34 @@ textarea{resize:vertical;min-height:60px}
   </div>
 
   <!-- ── PRICING ADMIN VIEW (Admin only) ───────────── -->
+  <!-- ── FIELD MAPPING VIEW ──────────────────────────────────── -->
+  <div class="view" id="view-field-mapping">
+    <div class="dash-hero" style="background:linear-gradient(135deg,#0a1628 0%,#0f2a1e 50%,#0a1628 100%)">
+      <div class="dash-hero-bg"></div>
+      <div class="dash-hero-content">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between">
+          <div>
+            <div class="dash-hero-greeting">Field <span style="color:#34D399">Mapping</span> &amp; Role Config</div>
+            <div style="font-size:13px;color:rgba(255,255,255,.55);margin-top:4px">Admin-only · SFDC hierarchy, profile roles, object field names, integrations</div>
+          </div>
+          <div style="display:flex;gap:10px;align-items:center">
+            <button onclick="saveFieldMapping()" style="background:#059669;border:none;color:#fff;padding:7px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(5,150,105,.4)">💾 Save All Changes</button>
+            <div id="fmSaveStatus" style="font-size:11px;color:rgba(255,255,255,.5)"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Tab bar -->
+    <div style="display:flex;gap:0;border-bottom:1px solid var(--border);background:var(--card);padding:0 28px" id="fmTabBar">
+      <button class="fm-tab active" onclick="setFMTab('roles',this)">Role Hierarchy</button>
+      <button class="fm-tab" onclick="setFMTab('profiles',this)">Profile → Role</button>
+      <button class="fm-tab" onclick="setFMTab('quote-fields',this)">Quote Fields</button>
+      <button class="fm-tab" onclick="setFMTab('opp-fields',this)">Opportunity Fields</button>
+      <button class="fm-tab" onclick="setFMTab('n8n',this)">N8N / Webhooks</button>
+    </div>
+    <div style="padding:24px 28px" id="fmBody"></div>
+  </div>
+
   <div class="view" id="view-pricing-admin">
     <div class="dash-hero" style="background:linear-gradient(135deg,#0C0E2B 0%,#1a0a3d 50%,#0C0E2B 100%)">
       <div class="dash-hero-bg"></div>
@@ -1051,14 +1110,31 @@ function canAccess(permission){
 }
 
 function filterDealsForRole(allDeals){
-  const role = getRole();
-  if(role.canViewAllDeals) return allDeals;
-  if(role.canViewTeamDeals){
-    // Manager sees all deals (in real app: filter by team)
-    return allDeals;
+  const role     = getRole();
+  const visScope = SESSION_USER.sfdcVisScope || (role.canViewAllDeals ? 'all' : role.canViewTeamDeals ? 'team' : 'own');
+  const sfRole   = SESSION_USER.sfdcRoleName || '';
+
+  // Admin (RevOps / System Administrator) — always sees everything
+  if(role.canViewAllDeals || visScope === 'all') return allDeals;
+
+  // Team scope — filter by which AE/RD roles this manager oversees
+  if(visScope === 'team') {
+    const teamRoles = SFDC_ROLE_TEAM_SCOPE[sfRole] || [];
+    if(!teamRoles.length) return allDeals; // no scope defined → show all (safe fallback for new roles)
+    return allDeals.filter(function(d) {
+      // Include deals owned by the manager themselves
+      if(d.repName === SESSION_USER.repName) return true;
+      // Include deals where the rep's SFDC role is in this manager's team scope
+      // Deals store the rep's role in d.repSfdcRole (set when deal is created from SFDC button)
+      if(d.repSfdcRole && teamRoles.includes(d.repSfdcRole)) return true;
+      // Fallback: if rep role not stored, include deals by team member names
+      // (populated when deals are pushed from SFDC — d.repName matches a team member)
+      return false;
+    });
   }
-  // Sales rep sees only their own deals
-  return allDeals.filter(d => d.repName === SESSION_USER.repName);
+
+  // Own scope — rep sees only their own deals
+  return allDeals.filter(function(d){ return d.repName === SESSION_USER.repName; });
 }
 
 function renderSidebarUser(){
@@ -1097,6 +1173,15 @@ function renderSidebarUser(){
       pricingNav.style.display = 'none';
     } else {
       pricingNav.style.display = '';
+    }
+  }
+  // Apply nav permissions — field mapping (same access level as pricing admin)
+  const fmNav = el('nav-field-mapping');
+  if(fmNav){
+    if(!canAccess('canViewPricingAdmin')){
+      fmNav.style.display = 'none';
+    } else {
+      fmNav.style.display = '';
     }
   }
   // Apply nav permissions
@@ -1807,6 +1892,7 @@ function switchRole(role){
   renderDashboard();
   if(currentView === 'approval-matrix') renderApprovalMatrix();
   if(currentView === 'pricing-admin') { if(canAccess('canViewPricingAdmin')) renderPricingAdmin(); else showView('dashboard'); }
+  if(currentView === 'field-mapping') { if(canAccess('canViewPricingAdmin')) renderFieldMapping(); else showView('dashboard'); }
   enforceDashboardPermissions();
 }
 
@@ -1967,7 +2053,7 @@ const TOTAL_STEPS=9;
 function freshState(){
   return{
     dealType:'NB', dealId:'ATL-'+Math.floor(1000+Math.random()*9000),
-    repName:'', repEmail:'',
+    repName:'', repEmail:'', repSfdcRole:'',
     platformTier:null,assets:0,platformList:0,platformNet:0,platformDisc:0,
     hasRamp:false,rampYears:1,rampData:[],
     users:[
@@ -2057,6 +2143,7 @@ function showView(name){
     cpq:['New Deal — '+dealTypeLabel(state.dealType),'Atlan CPQ · FY25'],
     'approval-matrix':['Approval Matrix','Edit discount thresholds — changes apply immediately'],
     'pricing-admin':['Pricing Configuration','Admin only · Edit master pricing · Changes apply to all new quotes'],
+    'field-mapping':['Field Mapping & Role Config','Admin only · SFDC hierarchy, profile roles, object fields, N8N'],
     'quotes':['Quotes','All quotes linked to SFDC Opportunities'],
     'sfdc-settings':['Salesforce Integration','OAuth2 connection · Push quotes · Sync error log']};
   const t=titles[name]||['',''];
@@ -2070,6 +2157,15 @@ function showView(name){
   if(name==='pricing-admin'){
     if(!canAccess('canViewPricingAdmin')){ showAccessDenied('Pricing Configuration'); showView('dashboard'); return; }
     showPricingAdmin();
+  }
+  if(name==='field-mapping'){
+    if(!canAccess('canViewPricingAdmin')){ showAccessDenied('Field Mapping'); showView('dashboard'); return; }
+    fmActiveTab = 'roles';
+    // reset tab highlights
+    setTimeout(function(){
+      document.querySelectorAll('.fm-tab').forEach(function(b,i){ b.classList.toggle('active', i===0); });
+      renderFieldMapping();
+    }, 0);
   }
   if(name==='quotes'){ renderQuotes(); }
   if(name==='sfdc-settings'){ sfdcPopulateCreds(); renderSfdcErrorLog(); }
@@ -2276,6 +2372,10 @@ function startDeal(){
       if(sfPrefill.contactEmail) state.email    = sfPrefill.contactEmail;
       window._sfdcOppPrefill = null; // consume once
     }
+    // ── Always stamp the current user as the rep ──
+    if(!state.repName)  state.repName    = SESSION_USER.name  || '';
+    if(!state.repEmail) state.repEmail   = SESSION_USER.email || '';
+    state.repSfdcRole = SESSION_USER.sfdcRoleName || '';
     // Auto-name the quote
     state.quoteName = (state.legal ? state.legal+' — ' : '') + 'v'+nextV;
     if(dealType !== 'NB'){
@@ -3878,9 +3978,75 @@ function printOF(){
 // approvalType: 'Discount' | 'NST'
 // key: 'highest' | 'nst_rmv_mkt' etc.
 // ap: the local state.approvals[key] object
+// ── Write a status change to SFDC Quote — fires on every transition ──
+// Called from setApproval(), sfdcPushQuote(), and acceptQuote()
+// Writes: status, timestamp, and whoever acted — all in one PATCH
+async function sfdcWriteStatusChange(newStatus, actorName, extra) {
+  const quoteId = state.sfdcQuoteId;
+  if(!quoteId) return; // not yet pushed to SFDC — skip silently
+  const tok = sfdcLoadToken ? sfdcLoadToken() : null;
+  if(!tok || !tok.access_token) return;
+
+  const now = new Date().toISOString();
+  const patch = {};
+  patch[F('quote','status')]           = newStatus;
+  patch[F('quote','lastStatusChange')] = now;
+
+  if(newStatus === 'In Review') {
+    patch[F('quote','submittedBy')] = actorName || SESSION_USER.name || '';
+    patch[F('quote','submittedAt')] = now;
+  }
+  if(newStatus === 'Approved') {
+    patch[F('quote','approvedBy')] = actorName || '';
+    patch[F('quote','approvedAt')] = now;
+  }
+  if(newStatus === 'Rejected') {
+    patch[F('quote','rejectedBy')]      = actorName || '';
+    patch[F('quote','rejectedAt')]      = now;
+    patch[F('quote','rejectionReason')] = (extra && extra.reason) || '';
+  }
+  // NST-specific fields
+  if(newStatus === 'NST Approved') {
+    patch[F('quote','status')]        = state.quoteStatus || 'In Review'; // keep main status
+    patch[F('quote','nstApprovedBy')] = actorName || '';
+    patch[F('quote','nstApprovedAt')] = now;
+  }
+  if(newStatus === 'NST Rejected') {
+    patch[F('quote','status')]              = state.quoteStatus || 'In Review';
+    patch[F('quote','nstRejectedBy')]       = actorName || '';
+    patch[F('quote','nstRejectionReason')]  = (extra && extra.reason) || '';
+  }
+
+  if(newStatus === 'Accepted') {
+    patch[F('quote','acceptedBy')] = actorName || '';
+    patch[F('quote','acceptedAt')] = now;
+  }
+
+  // Mirror Approval_Status__c to Opportunity
+  const oppId = state.sfdcOppId;
+  const oppStatus = {
+    'Draft':     'Not Submitted',
+    'In Review': 'Pending',
+    'Approved':  'Approved',
+    'Rejected':  'Rejected',
+    'Accepted':  'Approved',
+  }[newStatus];
+
+  try {
+    await sfdcApiCall('/services/data/v59.0/sobjects/Quote/' + quoteId, 'PATCH', patch);
+    if(oppId && oppStatus) {
+      const oppPatch = {};
+      oppPatch[F('oppWrite','approvalStatus')] = oppStatus;
+      await sfdcApiCall('/services/data/v59.0/sobjects/Opportunity/' + oppId, 'PATCH', oppPatch);
+    }
+  } catch(e) {
+    sfdcLogError('Status change write failed (' + newStatus + '): ' + (e.message||e));
+  }
+}
+
 async function sfdcPollApprovalStatus() {
-  // Polls standard ProcessInstance (native SFDC approval object)
-  // No custom object needed — SFDC writes ProcessInstanceStep automatically
+  // Polls Quote fields directly for approval status
+  // N8N writes back to SFDC when approver acts in Slack — tool reads it here
   const quoteId = state.sfdcQuoteId;
   const oppId   = state.sfdcOppId;
   if(!quoteId && !oppId) return null;
@@ -3960,7 +4126,7 @@ async function sfdcPollApprovalStatus() {
 
     // Mirror Approval_Status__c to Opportunity for pipeline reporting
     const approvalPatch = {};
-    approvalPatch[F('opp','approvalStatus')] = status;
+    approvalPatch[F('oppWrite','approvalStatus')] = status;
     if(oppId) await sfdcApiCall('/services/data/v59.0/sobjects/Opportunity/' + oppId, 'PATCH', approvalPatch);
 
     renderApprovalStep();
@@ -4040,20 +4206,20 @@ async function sfdcReadBackApprovals() {
 // QUOTE STATUS CONSTANTS
 // Previously lived in the contracts block — restored here as standalone
 // ═══════════════════════════════════════════════════════════════════
-const QUOTE_STATUS_ORDER = ['Draft','Pending Approval','Approved','Accepted','Rejected'];
+const QUOTE_STATUS_ORDER = ['Draft','In Review','Approved','Accepted','Rejected'];
 const QUOTE_STATUS_COLOR = {
-  'Draft':           '#8896AA',
-  'Pending Approval':'#E89B00',
-  'Approved':        '#16A34A',
-  'Accepted':        '#6B4FA8',
-  'Rejected':        '#D63B3B',
+  'Draft':     '#8896AA',
+  'In Review': '#E89B00',
+  'Approved':  '#16A34A',
+  'Accepted':  '#6B4FA8',
+  'Rejected':  '#D63B3B',
 };
 const QUOTE_STATUS_ICON = {
-  'Draft':           '📝',
-  'Pending Approval':'⏳',
-  'Approved':        '✅',
-  'Accepted':        '🤝',
-  'Rejected':        '❌',
+  'Draft':     '📝',
+  'In Review': '⏳',
+  'Approved':  '✅',
+  'Accepted':  '🤝',
+  'Rejected':  '❌',
 };
 
 // ── Stub for removed contract store — UP/RN deals now reference prior quotes ──
@@ -4063,6 +4229,19 @@ function loadContracts() { return []; }
 function saveContracts(arr) { /* no-op in V1 */ }
 
 // ═══════════════════════════════════════════════════════════════════
+// N8N WEBHOOK CONFIG
+// ── Set these once. Webhook URLs come from your N8N workflow triggers ──
+// N8N_WEBHOOK_URL: the URL N8N gives you for Workflow 1 (Submit notification)
+// N8N_CALLBACK_SECRET: a shared secret you set in both N8N and here to
+//   verify that status callbacks actually came from your N8N instance
+// ═══════════════════════════════════════════════════════════════════
+const N8N_CONFIG = {
+  webhookUrl:      '',   // paste Workflow 1 URL here e.g. https://atlan.app.n8n.cloud/webhook/cpq-submit
+  callbackSecret:  '',   // any random string — must match what you set in N8N
+  enabled:         false, // set to true once N8N is configured
+};
+
+// ═══════════════════════════════════════════════════════════════════
 // SALESFORCE FIELD MAP
 // ── Single source of truth for every API field name ──────────────
 // To remap a field: change the value here. Nothing else needs editing.
@@ -4070,13 +4249,10 @@ function saveContracts(arr) { /* no-op in V1 */ }
 // ═══════════════════════════════════════════════════════════════════
 const SFDC_FIELD_MAP = {
 
-  // ── Opportunity fields (written on every push) ──────────────────
-  // NOTE: governance/pricing fields now live on Quote, not Opp.
-  // Only the OpportunityId relationship and approval process target remain here.
-  opp: {
-    // No custom pricing fields written directly to Opp anymore.
-    // These are kept for the Approval Process contextId reference:
-    approvalStatus:  'Approval_Status__c',        // Picklist on Opp — still synced for pipeline reporting
+  // ── Opportunity fields (written back on status change) ──────────
+  oppWrite: {
+    approvalStatus:  'Approval_Status__c',        // Picklist on Opp — synced for pipeline reporting. CREATE THIS.
+    recordTypeId:    'RecordTypeId',              // Standard — used to detect deal type from button URL
   },
 
   // ── Quote fields (written on every push) ────────────────────────
@@ -4084,7 +4260,7 @@ const SFDC_FIELD_MAP = {
   quote: {
     externalId:      'CPQ_Quote_ID__c',           // External ID (Text 30) — upsert key. CREATE THIS FIELD.
     // Standard Quote fields (already exist — no setup needed):
-    status:          'Status',                    // Picklist (Draft/Approved/Rejected/etc.)
+    status:          'Status',                    // Picklist: Draft / In Review / Approved / Rejected / Accepted
     discountPct:     'Discount',                  // Percent(3,2) — standard Quote.Discount field
     discountNotes:   'Description',               // Long Text 32000 — standard Quote.Description
     // Custom Quote fields to create in SFDC:
@@ -4095,6 +4271,22 @@ const SFDC_FIELD_MAP = {
     competitor:      'Competitor__c',             // Text(100) or Picklist. CREATE THIS.
     dealDeskFlag:    'Deal_Desk_Flag__c',         // Checkbox. CREATE THIS.
     version:         'CPQ_Version__c',            // Number(2,0) — quote version. CREATE THIS.
+    // ── Audit trail fields — written on every status change ──────────
+    submittedBy:     'Submitted_By__c',           // Text(100) — rep who submitted. CREATE THIS.
+    submittedAt:     'Submitted_At__c',           // DateTime. CREATE THIS.
+    approvedBy:      'Approved_By__c',            // Text(100) — approver name. CREATE THIS.
+    approvedAt:      'Approved_At__c',            // DateTime. CREATE THIS.
+    rejectedBy:      'Rejected_By__c',            // Text(100). CREATE THIS.
+    rejectedAt:      'Rejected_At__c',            // DateTime. CREATE THIS.
+    rejectionReason: 'Rejection_Reason__c',       // Text Area(2000). CREATE THIS.
+    nstApprovedBy:   'NST_Approved_By__c',        // Text(100) — NST approver. CREATE THIS.
+    nstApprovedAt:   'NST_Approved_At__c',        // DateTime. CREATE THIS.
+    nstRejectedBy:   'NST_Rejected_By__c',        // Text(100). CREATE THIS.
+    nstRejectionReason: 'NST_Rejection_Reason__c', // Text Area. CREATE THIS.
+    lastStatusChange: 'Last_Status_Change__c',    // DateTime — any status change. CREATE THIS.
+    acceptedBy:      'Accepted_By__c',            // Text(100) — RevOps who accepted. CREATE THIS.
+    acceptedAt:      'Accepted_At__c',            // DateTime. CREATE THIS.
+    approverName:    'Approver_Name__c',          // Text(100) — name of required approver. CREATE THIS.
   },
 
   // ── Opportunity fields (read on auto-fetch when Opp ID entered) ─
@@ -4222,20 +4414,76 @@ function sfdcPopulateCreds() {
 // ── Harsh: no code changes needed — edit the values here only ────────
 // ═══════════════════════════════════════════════════════════════════
 const SFDC_ROLE_MAP = {
-  // Full access: pricing config, approval matrix, all deals, all quotes
-  // → Atlan RevOps team
+  // Full access: pricing config, approval matrix, all deals
   admin: [
-    'System Administrator',  // SFDC sys admin — always gets full access
-    'Atlan Administrator',   // RevOps profile
+    'System Administrator',  // SFDC system admin — always full access
+    'Atlan Administrator',   // RevOps / Harsh
   ],
   // Team access: team deals, approval queue, read-only matrix
-  // → RSDs and Sales Leadership who approve deals
   sales_manager: [
-    'Atlan Manager',         // Approver profile (RSD, Sales Leadership, CRO, CEO)
+    'Atlan Manager',         // RSDs, VP NAM, CRO, CEO — approvers and team leads
   ],
   // Own deals only — reps creating and submitting quotes
-  // → Catch-all: Atlan User + anything not listed above
-  sales_rep: [],             // 'Atlan User' and all other profiles default here
+  sales_rep: [
+    'Atlan User',            // Standard rep — all Account Executives
+  ],
+  // catch-all: anything not listed above → sales_rep (most restrictive)
+};
+
+// ── SFDC Role → visibility scope ────────────────────────────────────
+// Maps SFDC UserRole.Name to how much of the deal pipeline this user can see.
+// 'all'  → every deal in the system (CEO, CRO)
+// 'team' → deals owned by direct reports + their reports (VPs, Regional Directors)
+// 'own'  → own deals only (Account Executives)
+const SFDC_ROLE_VISIBILITY = {
+  // See everything
+  'CEO':                                    'all',
+  'CRO':                                    'all',
+  // NAM hierarchy — Brian + all Regional Directors under him
+  'VP NAM':                                 'team',
+  'Regional Director of Sales - Central':   'team',
+  'Regional Director of Sales - East':      'team',
+  'Regional Director of Sales - Northeast': 'team',
+  'Regional Director of Sales - West':      'team',
+  'Regional Director of Sales - Majors & Expansion': 'team',
+  // EMEA hierarchy — Andrew
+  'Regional Director of Sales - EMEA':      'team',
+  // AEs — own deals only
+  'Account Executive - Central':            'own',
+  'Account Executive - East':               'own',
+  'Account Executive - Northeast':          'own',
+  'Account Executive - West':               'own',
+  'Account Executive - Majors & Expansion': 'own',
+  'Account Executive - EMEA':               'own',
+};
+
+// Maps SFDC UserRole.Name to which AE roles this manager can see
+// Used by filterDealsForRole() for team-scoped managers
+const SFDC_ROLE_TEAM_SCOPE = {
+  // Brian (VP NAM) sees all NAM AEs via the Regional Directors
+  'VP NAM': [
+    'Account Executive - Central',
+    'Account Executive - East',
+    'Account Executive - Northeast',
+    'Account Executive - West',
+    'Account Executive - Majors & Expansion',
+    // Also see the Regional Directors themselves if they own deals
+    'Regional Director of Sales - Central',
+    'Regional Director of Sales - East',
+    'Regional Director of Sales - Northeast',
+    'Regional Director of Sales - West',
+    'Regional Director of Sales - Majors & Expansion',
+  ],
+  // Andrew (Regional Director - EMEA) sees EMEA AEs
+  'Regional Director of Sales - EMEA': [
+    'Account Executive - EMEA',
+  ],
+  // Each Regional Director sees their region's AEs
+  'Regional Director of Sales - Central':   ['Account Executive - Central'],
+  'Regional Director of Sales - East':      ['Account Executive - East'],
+  'Regional Director of Sales - Northeast': ['Account Executive - Northeast'],
+  'Regional Director of Sales - West':      ['Account Executive - West'],
+  'Regional Director of Sales - Majors & Expansion': ['Account Executive - Majors & Expansion'],
 };
 
 // Resolve a SFDC Profile.Name to a tool role key
@@ -4276,16 +4524,18 @@ async function sfdcFetchCurrentUser() {
     const profileName = (userRes.Profile && userRes.Profile.Name) || '';
     const roleName    = (userRes.UserRole && userRes.UserRole.Name) || '';
     const toolRole    = sfdcProfileToRole(profileName) || sfdcProfileToRole(roleName);
+    const visScope    = SFDC_ROLE_VISIBILITY[roleName] || 'own';
 
     // Update SESSION_USER with real SFDC identity
-    SESSION_USER.name      = userRes.Name      || SESSION_USER.name;
-    SESSION_USER.firstName = (userRes.Name||'').split(' ')[0] || SESSION_USER.firstName;
-    SESSION_USER.email     = userRes.Email     || SESSION_USER.email;
-    SESSION_USER.role      = toolRole;
-    SESSION_USER.initials  = (userRes.Name||'').split(' ').map(function(w){ return w[0]; }).join('').slice(0,2).toUpperCase() || SESSION_USER.initials;
+    SESSION_USER.name            = userRes.Name || SESSION_USER.name;
+    SESSION_USER.firstName       = (userRes.Name||'').split(' ')[0] || SESSION_USER.firstName;
+    SESSION_USER.email           = userRes.Email || SESSION_USER.email;
+    SESSION_USER.role            = toolRole;
+    SESSION_USER.initials        = (userRes.Name||'').split(' ').map(function(w){ return w[0]; }).join('').slice(0,2).toUpperCase() || SESSION_USER.initials;
     SESSION_USER.sfdcProfileName = profileName;
-    SESSION_USER.sfdcRoleName    = roleName;
-    SESSION_USER.repName   = userRes.Name || SESSION_USER.repName;
+    SESSION_USER.sfdcRoleName    = roleName;     // SFDC UserRole.Name — drives team scoping
+    SESSION_USER.sfdcVisScope    = visScope;     // 'all' | 'team' | 'own'
+    SESSION_USER.repName         = userRes.Name || SESSION_USER.repName;
 
     // Show dev role switcher only for System Administrators
     var devPanel = el('devRoleSwitcher');
@@ -4427,7 +4677,7 @@ async function sfdcCreateQuoteRecord(snap, oppId, totalNet, totalList, disc) {
     Name:            snap.quoteName || (snap.legal+' — v'+(snap.quoteVersion||1)),
     ExpirationDate:  snap.endDate || null,
     // Standard Quote fields (exist in Travis's org — confirmed from screenshot):
-    Status:          snap.quoteStatus==='Approved' ? 'Approved' : 'Draft',
+    Status:          'Draft',  // Always starts as Draft — status updates via sfdcWriteStatusChange()
     Description:     snap.notes || '',   // maps to discountNotes
     Discount:        parseFloat(disc.toFixed(2)),  // standard Discount (Percent 3,2)
   };
@@ -4439,6 +4689,12 @@ async function sfdcCreateQuoteRecord(snap, oppId, totalNet, totalList, disc) {
   if(snap.competitor)   quotePayload[F('quote','competitor')]   = snap.competitor;
   if(snap.dealDeskFlag) quotePayload[F('quote','dealDeskFlag')] = true;
   quotePayload[F('quote','version')]       = snap.quoteVersion||1;
+  // Approver name is set on Submit (In Review transition) — preset from tier config
+  if(snap.quoteStatus === 'In Review' || snap.quoteStatus === 'Pending Approval') {
+    const{disc} = getTotals();
+    const tier = getTier(disc);
+    quotePayload[F('quote','approverName')] = tier.approver || tier.label || '';
+  }
   try {
     // Upsert by external ID field CPQ_Quote_ID__c
     const res = await sfdcApiCall(
@@ -4579,68 +4835,36 @@ async function sfdcPushQuote() {
   if(statusEl) statusEl.textContent = 'Writing line items…';
   await sfdcPushQuoteLineItems(sfdcQId, items);
 
-  // ── Step 3: Sync Approval_Status__c to Opportunity for pipeline reporting ──
-  const oppStatusPatch = {};
-  oppStatusPatch[F('opp','approvalStatus')] = disc<=15 ? 'Approved' : 'Pending';
-  await sfdcApiCall('/services/data/v59.0/sobjects/Opportunity/' + oppId, 'PATCH', oppStatusPatch);
-
-  // ── Step 4: Approval routing — Approval Process targets Quote record ──
+  // ── Step 3: Set status to "In Review" (or "Approved" for Tier 1 auto-approve) ──
   if(disc <= 15) {
-    const qApprPatch = {}; qApprPatch[F('quote','status')] = 'Approved';
-    await sfdcApiCall('/services/data/v59.0/sobjects/Quote/' + sfdcQId, 'PATCH', qApprPatch);
-    const oppApprPatch = {}; oppApprPatch[F('opp','approvalStatus')] = 'Approved';
-    await sfdcApiCall('/services/data/v59.0/sobjects/Opportunity/' + oppId, 'PATCH', oppApprPatch);
-    // Tier 1 auto-approval — update local state and sync Quote status
-    state.approvals['highest'] = { status:'approved', email:'auto', rejectionReason:'', actionedAt: new Date().toISOString() };
+    // Tier 1: auto-approve immediately — no human action needed
+    state.approvals['highest'] = {
+      status:'approved', email:'auto', approverName:'Auto (≤15%)',
+      rejectionReason:'', actionedAt: new Date().toISOString()
+    };
     changeQuoteStatus(state.dealId, 'Approved');
     state.quoteStatus = 'Approved';
-    if(statusEl) statusEl.innerHTML = '<span style="color:#00B87A">✓ Auto-approved · Quote + Opp updated</span>';
-    showToast('Auto-approved and stored in Salesforce ✓','#00B87A');
+    // Write Approved status + timestamps to SFDC
+    await sfdcWriteStatusChange('Approved', SESSION_USER.name + ' (auto-approved)', null);
+    if(statusEl) statusEl.innerHTML = '<span style="color:#00B87A">✓ Auto-approved and written to Salesforce</span>';
+    showToast('Auto-approved and written to Salesforce ✓','#00B87A');
     renderApprovalStep();
   } else {
-    // Tier 2–5: submit Approval Process targeting the Quote record (not Opp)
-    const apprRes = await sfdcApiCall('/services/data/v59.0/process/approvals/', 'POST', {
-      requests: [{ actionType:'Submit', contextId: sfdcQId,
-        comments: (snap.discReason||'') + (snap.notes ? ' — ' + snap.notes : '') }]
-    });
-    if(apprRes) {
-      if(apprRes.results && apprRes.results[0] && apprRes.results[0].newWorkitemIds) {
-        const workitemId = apprRes.results[0].newWorkitemIds[0];
-        if(workitemId) {
-          const piRes = await sfdcApiCall(
-            '/services/data/v59.0/query?q='+encodeURIComponent('SELECT ProcessInstanceId FROM ProcessInstanceWorkitem WHERE Id=\''+workitemId+'\' LIMIT 1'), 'GET'
-          );
-          if(piRes && piRes.records && piRes.records[0]) {
-            state.sfdcApprovalInstanceId = piRes.records[0].ProcessInstanceId;
-            saveDeal();
-          }
-        }
-      }
-      state.approvals['highest'] = state.approvals['highest'] || {};
-      state.approvals['highest'].status = 'pending';
-      state.approvals['highest'].actionedAt = new Date().toISOString();
-      if(statusEl) statusEl.innerHTML = '<span style="color:#1B5FC4">↑ Submitted for '+tier.label+' approval — polling…</span>';
-      showToast('Submitted for '+tier.label+' approval','#1B5FC4');
-      renderApprovalStep();
-      let pollCount = 0;
-      const pollInterval = setInterval(async function() {
-        pollCount++;
-        const liveStatus = await sfdcPollApprovalStatus();
-        if(liveStatus === 'Approved' || liveStatus === 'Rejected') {
-          clearInterval(pollInterval);
-          const color = liveStatus === 'Approved' ? '#00B87A' : '#D63B3B';
-          showToast('Salesforce approval: ' + liveStatus, color);
-          if(statusEl) statusEl.innerHTML = '<span style="color:'+color+'">'+liveStatus+' in Salesforce</span>';
-          const qSyncPatch = {}; qSyncPatch[F('quote','status')] = liveStatus;
-          if(state.sfdcQuoteId) await sfdcApiCall('/services/data/v59.0/sobjects/Quote/'+state.sfdcQuoteId,'PATCH',qSyncPatch);
-        } else if(pollCount >= 20) {
-          clearInterval(pollInterval);
-          if(statusEl) statusEl.innerHTML = '<span style="color:#E89B00">Still pending — check Salesforce</span>';
-        }
-      }, 30000);
-    } else {
-      if(statusEl) statusEl.innerHTML = '<span style="color:#E89B00">Quote pushed — approval submission failed (check log)</span>';
-    }
+    // Tier 2–5: set to "In Review" — approver acts in the tool
+    // Write "In Review" + submitted_by + submitted_at to SFDC
+    changeQuoteStatus(state.dealId, 'In Review');
+    state.quoteStatus = 'In Review';
+    state.approvals['highest'] = state.approvals['highest'] || {};
+    state.approvals['highest'].status = 'pending';
+    state.approvals['highest'].pendingAt = new Date().toISOString();
+    state.approvals['highest'].submittedBy = SESSION_USER.name;
+    await sfdcWriteStatusChange('In Review', SESSION_USER.name, null);
+    // ── Fire N8N webhook → Slack DM + Email to approver ──
+    n8nNotifySubmit(snap, tier, SESSION_USER.name).catch(function(){});
+    saveDeal();
+    if(statusEl) statusEl.innerHTML = '<span style="color:#E89B00">⏳ Submitted — notifying '+tier.label+' approver via Slack &amp; Email…</span>';
+    showToast('Submitted for ' + tier.label + ' approval — approver notified via Slack','#E89B00');
+    renderApprovalStep();
   }
   renderSfdcErrorLog();
 }
@@ -5789,6 +6013,368 @@ function sfdcAuthGateConnect() {
   });
 }
 
+// ── FIELD MAPPING ────────────────────────────────────────────────
+var fmActiveTab = 'roles';
+
+function setFMTab(tab, btn) {
+  fmActiveTab = tab;
+  document.querySelectorAll('.fm-tab').forEach(function(b){ b.classList.remove('active'); });
+  if(btn) btn.classList.add('active');
+  renderFMTab();
+}
+
+function renderFieldMapping() {
+  renderFMTab();
+}
+
+function renderFMTab() {
+  var body = el('fmBody');
+  if(!body) return;
+  if(fmActiveTab === 'roles')        body.innerHTML = renderFMRoles();
+  else if(fmActiveTab === 'profiles') body.innerHTML = renderFMProfiles();
+  else if(fmActiveTab === 'quote-fields') body.innerHTML = renderFMQuoteFields();
+  else if(fmActiveTab === 'opp-fields')   body.innerHTML = renderFMOppFields();
+  else if(fmActiveTab === 'n8n')          body.innerHTML = renderFMN8N();
+}
+
+// ── Tab 1: Role Hierarchy ─────────────────────────────────────────
+function renderFMRoles() {
+  // Build a live-editable tree from SFDC_ROLE_VISIBILITY + SFDC_ROLE_TEAM_SCOPE
+  var allRoles = Object.keys(SFDC_ROLE_VISIBILITY);
+  var topLevel = allRoles.filter(function(r){ return SFDC_ROLE_VISIBILITY[r]==='all'; });
+  var teamLevel = allRoles.filter(function(r){ return SFDC_ROLE_VISIBILITY[r]==='team'; });
+  var ownLevel  = allRoles.filter(function(r){ return SFDC_ROLE_VISIBILITY[r]==='own'; });
+
+  function visOpts(role) {
+    var v = SFDC_ROLE_VISIBILITY[role] || 'own';
+    return ['all','team','own'].map(function(o){
+      return '<option value="'+o+'"'+(v===o?' selected':'')+'>'+o+'</option>';
+    }).join('');
+  }
+
+  function roleRow(role, level, children) {
+    var v = SFDC_ROLE_VISIBILITY[role] || 'own';
+    var badge = v==='all'?'fm-badge-all':v==='team'?'fm-badge-team':'fm-badge-own';
+    var indentStyle = 'margin-left:'+(level*28)+'px';
+    var teamScope = (SFDC_ROLE_TEAM_SCOPE[role]||[]).join(', ');
+    return '<div style="'+indentStyle+';display:flex;align-items:flex-start;gap:8px;margin-bottom:6px">'
+      +(level>0?'<div style="width:16px;flex-shrink:0;border-left:2px solid var(--border);border-bottom:2px solid var(--border);height:16px;margin-top:8px;border-radius:0 0 0 4px"></div>':'')
+      +'<div class="fm-tree-item level-'+level+'" style="flex:1">'
+        +'<div style="flex:1">'
+          +'<div style="font-size:12px;font-weight:600;color:var(--text)">'+role+'</div>'
+          +(teamScope?'<div style="font-size:10.5px;color:var(--muted);margin-top:1px">Sees: '+teamScope+'</div>':'')
+        +'</div>'
+        +'<select class="fm-scope-select" onchange="updateRoleVisibility(\''+role.replace(/'/g,"\\'")+'\'  ,this.value)">'
+          +visOpts(role)
+        +'</select>'
+        +'<span class="fm-badge '+badge+'">'+v+'</span>'
+      +'</div>'
+    +'</div>';
+  }
+
+  var html = '<div class="fm-card">'
+    +'<div class="fm-card-title">🏢 SFDC Role Hierarchy — Visibility Scope</div>'
+    +'<div class="fm-card-sub">Maps each SFDC UserRole.Name to how much of the deal pipeline that user can see. Changes take effect on the user\'s next login.</div>'
+    +'<div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap">'
+      +'<span class="fm-badge fm-badge-all">all — every deal</span>'
+      +'<span class="fm-badge fm-badge-team">team — direct reports\' deals</span>'
+      +'<span class="fm-badge fm-badge-own">own — own deals only</span>'
+    +'</div>';
+
+  // Render hierarchy: CRO/CEO → VPs → RDs → AEs
+  html += roleRow('CRO', 0);
+  html += roleRow('CEO', 0);
+  html += roleRow('VP NAM', 1);
+  // NAM Regional Directors
+  ['Regional Director of Sales - Central','Regional Director of Sales - East',
+   'Regional Director of Sales - Northeast','Regional Director of Sales - West',
+   'Regional Director of Sales - Majors & Expansion'].forEach(function(r){
+    html += roleRow(r, 2);
+    // AEs under each RD
+    var scope = SFDC_ROLE_TEAM_SCOPE[r]||[];
+    scope.forEach(function(ae){ html += roleRow(ae, 3); });
+  });
+  html += roleRow('Regional Director of Sales - EMEA', 1);
+  html += roleRow('Account Executive - EMEA', 2);
+
+  html += '</div>';
+
+  // Team scope editor
+  html += '<div class="fm-card">'
+    +'<div class="fm-card-title">👥 Manager Team Scope</div>'
+    +'<div class="fm-card-sub">Defines which SFDC roles each team-scoped manager can see deals for. One role per line.</div>';
+
+  Object.keys(SFDC_ROLE_TEAM_SCOPE).forEach(function(manager) {
+    var scope = SFDC_ROLE_TEAM_SCOPE[manager];
+    html += '<div class="fm-row">'
+      +'<div class="fm-label">'+manager+'<div class="fm-label-sub">team scope</div></div>'
+      +'<textarea class="fm-input fm-code" rows="'+(scope.length||1)+'" style="resize:vertical" '
+        +'onchange="updateTeamScope(\''+manager.replace(/'/g,"\\'")+'\'  ,this.value)">'
+        +scope.join('\n')
+      +'</textarea>'
+    +'</div>';
+  });
+  html += '</div>';
+
+  // Add new role button
+  html += '<div style="display:flex;gap:10px;margin-top:4px">'
+    +'<input id="fmNewRole" placeholder="New SFDC Role name..." class="fm-input" style="max-width:320px"/>'
+    +'<select id="fmNewRoleScope" class="fm-scope-select" style="padding:7px 10px">'
+      +'<option value="own">own</option><option value="team">team</option><option value="all">all</option>'
+    +'</select>'
+    +'<button onclick="addFMRole()" style="padding:7px 14px;border-radius:6px;border:none;background:#059669;color:#fff;font-size:12px;font-weight:700;cursor:pointer">+ Add Role</button>'
+  +'</div>';
+
+  return html;
+}
+
+// ── Tab 2: Profile → Role ─────────────────────────────────────────
+function renderFMProfiles() {
+  function profileRows(roleKey, title, color) {
+    var profiles = SFDC_ROLE_MAP[roleKey] || [];
+    return '<div class="fm-row">'
+      +'<div class="fm-label"><span style="color:'+color+';font-weight:700">'+title+'</span>'
+        +'<div class="fm-label-sub">SFDC Profile.Name values</div></div>'
+      +'<div style="flex:1;display:flex;flex-direction:column;gap:4px">'
+        +profiles.map(function(p,i){
+          return '<div style="display:flex;gap:6px;align-items:center">'
+            +'<input class="fm-input fm-code" value="'+p+'" style="flex:1" '
+              +'onchange="updateProfileMapping(\''+roleKey+'\','+i+',this.value)"/>'
+            +'<button onclick="removeProfileMapping(\''+roleKey+'\','+i+')" '
+              +'style="padding:4px 8px;border:1px solid var(--border);border-radius:5px;background:transparent;color:var(--muted);cursor:pointer;font-size:11px">✕</button>'
+          +'</div>';
+        }).join('')
+        +'<button onclick="addProfileMapping(\''+roleKey+'\')" '
+          +'style="padding:5px 10px;border:1px dashed var(--border);border-radius:5px;background:transparent;color:var(--muted);cursor:pointer;font-size:11px;text-align:left">+ Add profile name</button>'
+      +'</div>'
+    +'</div>';
+  }
+
+  return '<div class="fm-card">'
+    +'<div class="fm-card-title">👤 SFDC Profile → Tool Role</div>'
+    +'<div class="fm-card-sub">Maps SFDC Profile.Name (exact string, case-insensitive) to a tool access level. Unrecognised profiles default to <strong>Sales Rep</strong> — most restrictive.</div>'
+    +profileRows('admin',        'Admin',        '#7C3AED')
+    +profileRows('sales_manager','Sales Manager','#D97706')
+    +profileRows('sales_rep',    'Sales Rep',    '#2563EB')
+    +'</div>'
+    +'<div class="fm-card" style="background:#FFFBEB;border-color:#FDE68A">'
+      +'<div class="fm-card-title" style="color:#92400E">ℹ How to find Profile names</div>'
+      +'<div style="font-size:12px;color:#78350F;line-height:1.7">'
+        +'In Salesforce: Setup → search "Profiles" → the Name column shows the exact string to use here. '
+        +'Currently configured: <strong>Atlan User</strong> (rep), <strong>Atlan Manager</strong> (manager), '
+        +'<strong>Atlan Administrator</strong> + <strong>System Administrator</strong> (admin).'
+      +'</div>'
+    +'</div>';
+}
+
+// ── Tab 3: Quote Fields ───────────────────────────────────────────
+function renderFMQuoteFields() {
+  var fm = SFDC_FIELD_MAP.quote || {};
+  var groups = [
+    { title: 'Core fields', keys: ['cpqQuoteId','status','discount','discountNotes'] },
+    { title: 'Pricing', keys: ['listPriceARR','proposedARR','discountTier','discountReason','competitor','dealDeskFlag','version'] },
+    { title: 'Audit trail — written on every status change', keys: ['submittedBy','submittedAt','approvedBy','approvedAt','rejectedBy','rejectedAt','rejectionReason','acceptedBy','acceptedAt','approverName','lastStatusChange'] },
+    { title: 'NST (Non-Standard Terms)', keys: ['nstApprovedBy','nstApprovedAt','nstRejectedBy','nstRejectionReason'] },
+  ];
+
+  var html = '<div class="fm-card">'
+    +'<div class="fm-card-title">📋 Quote Object — API Field Names</div>'
+    +'<div class="fm-card-sub">These are the Salesforce API names the tool uses when writing to the Quote object. If you rename a field in SFDC, update it here. <strong>CPQ_Quote_ID__c must remain the External ID.</strong></div>';
+
+  groups.forEach(function(g) {
+    html += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:14px 0 6px">'+g.title+'</div>';
+    g.keys.forEach(function(k) {
+      if(!fm.hasOwnProperty(k)) return;
+      html += '<div class="fm-row">'
+        +'<div class="fm-label">'+k+'<div class="fm-label-sub">SFDC API Name</div></div>'
+        +'<input class="fm-input fm-code" value="'+(fm[k]||'')+'" '
+          +'onchange="SFDC_FIELD_MAP.quote[\''+k+'\']=this.value" '
+          +'placeholder="Field_Name__c"/>'
+      +'</div>';
+    });
+  });
+
+  html += '</div>';
+  return html;
+}
+
+function renderFMOppFields() {
+  var fmRead  = SFDC_FIELD_MAP.oppRead  || {};
+  var fmWrite = SFDC_FIELD_MAP.oppWrite || {};
+
+  var readKeys  = Object.keys(fmRead);
+  var writeKeys = Object.keys(fmWrite);
+
+  function fieldRows(obj, keys, section) {
+    if(!keys.length) return '<div style="font-size:12px;color:var(--muted);padding:8px 0">No fields configured.</div>';
+    return keys.map(function(k) {
+      return '<div class="fm-row">'
+        +'<div class="fm-label">'+k+'<div class="fm-label-sub">SFDC API Name</div></div>'
+        +'<input class="fm-input fm-code" value="'+(obj[k]||'')+'" '
+          +'onchange="SFDC_FIELD_MAP.'+section+'[\''+k+'\']=this.value" '
+          +'placeholder="Field.Name or Field__c"/>'
+      +'</div>';
+    }).join('');
+  }
+
+  return '<div class="fm-card">'
+    +'<div class="fm-card-title">🏢 Opportunity — Read Fields</div>'
+    +'<div class="fm-card-sub">Fetched automatically when a rep enters an Opportunity ID. Populates company name, billing address, and primary contact in step 1.</div>'
+    +fieldRows(fmRead, readKeys, 'oppRead')
+    +'</div>'
+    +'<div class="fm-card">'
+    +'<div class="fm-card-title">🏢 Opportunity — Write Fields</div>'
+    +'<div class="fm-card-sub">Written back to the Opportunity on every quote status change. Mirrors approval state for pipeline reporting and Validation Rule support.</div>'
+    +fieldRows(fmWrite, writeKeys, 'oppWrite')
+    +'</div>';
+}
+
+// ── Tab 5: N8N / Webhooks ─────────────────────────────────────────
+function renderFMN8N() {
+  return '<div class="fm-card">'
+    +'<div class="fm-card-title">⚡ N8N Webhook Configuration</div>'
+    +'<div class="fm-card-sub">Set these once when your N8N workflows are active. The tool uses these on every Submit click. Set <strong>enabled: false</strong> to disable without losing the URLs.</div>'
+
+    +'<div class="fm-row">'
+      +'<div class="fm-label">Webhook URL<div class="fm-label-sub">N8N Workflow 1 — Submit notification</div></div>'
+      +'<input class="fm-input fm-code" id="fmN8NUrl" value="'+(N8N_CONFIG.webhookUrl||'')+'" placeholder="https://atlan.app.n8n.cloud/webhook/cpq-submit"/>'
+    +'</div>'
+
+    +'<div class="fm-row">'
+      +'<div class="fm-label">Callback Secret<div class="fm-label-sub">Shared secret — must match N8N env var CPQ_SECRET</div></div>'
+      +'<input class="fm-input fm-code" id="fmN8NSecret" value="'+(N8N_CONFIG.callbackSecret||'')+'" placeholder="any-random-string" type="password"/>'
+    +'</div>'
+
+    +'<div class="fm-row">'
+      +'<div class="fm-label">Enabled<div class="fm-label-sub">Flip to true when N8N is ready</div></div>'
+      +'<label style="display:flex;align-items:center;gap:8px;cursor:pointer">'
+        +'<input type="checkbox" id="fmN8NEnabled"'+(N8N_CONFIG.enabled?' checked':'')+' style="width:16px;height:16px;cursor:pointer"/>'
+        +'<span style="font-size:12px;color:var(--text)">'+(N8N_CONFIG.enabled?'Active — webhooks firing':'Disabled — submits work but no Slack/email notifications')+'</span>'
+      +'</label>'
+    +'</div>'
+
+    +'<div style="margin-top:14px;display:flex;gap:10px">'
+      +'<button onclick="saveN8NConfig()" style="padding:7px 16px;border-radius:6px;border:none;background:#059669;color:#fff;font-size:12px;font-weight:700;cursor:pointer">Save N8N Config</button>'
+      +'<button onclick="testN8NWebhook()" style="padding:7px 14px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text);font-size:12px;cursor:pointer">Test Webhook</button>'
+    +'</div>'
+    +'<div id="fmN8NTestResult" style="margin-top:10px;font-size:12px"></div>'
+
+    +'</div>'
+
+    +'<div class="fm-card" style="background:#F0FDF4;border-color:#BBF7D0">'
+      +'<div class="fm-card-title" style="color:#166534">📬 Callback URL (give this to N8N)</div>'
+      +'<div style="font-family:monospace;font-size:11.5px;background:#DCFCE7;padding:10px 12px;border-radius:6px;margin-top:8px;word-break:break-all;color:#14532D">'
+        +window.location.origin+window.location.pathname+'?quoteId={quoteId}&status={approved|rejected}&actor={name}&reason={reason}&token={secret}'
+      +'</div>'
+      +'<div style="font-size:11.5px;color:#166534;margin-top:8px">Paste this pattern into the HTTP Request node in N8N Workflow 2. Replace the <code>{}</code> placeholders with N8N expressions.</div>'
+    +'</div>';
+}
+
+// ── Field Mapping save/update helpers ────────────────────────────
+function updateRoleVisibility(role, newScope) {
+  SFDC_ROLE_VISIBILITY[role] = newScope;
+  renderFMTab();
+  showToast('Visibility updated for ' + role, '#059669');
+}
+
+function updateTeamScope(manager, value) {
+  var roles = value.split('\n').map(function(r){ return r.trim(); }).filter(Boolean);
+  SFDC_ROLE_TEAM_SCOPE[manager] = roles;
+  showToast('Team scope updated for ' + manager, '#059669');
+}
+
+function addFMRole() {
+  var name = (el('fmNewRole')?.value||'').trim();
+  var scope = el('fmNewRoleScope')?.value || 'own';
+  if(!name) { showToast('Enter a role name first','#D63B3B'); return; }
+  SFDC_ROLE_VISIBILITY[name] = scope;
+  if(scope === 'team') SFDC_ROLE_TEAM_SCOPE[name] = [];
+  if(el('fmNewRole')) el('fmNewRole').value = '';
+  renderFMTab();
+  showToast('Role "' + name + '" added with scope: ' + scope, '#059669');
+}
+
+function updateProfileMapping(roleKey, idx, value) {
+  if(SFDC_ROLE_MAP[roleKey]) SFDC_ROLE_MAP[roleKey][idx] = value.trim();
+}
+
+function addProfileMapping(roleKey) {
+  if(!SFDC_ROLE_MAP[roleKey]) SFDC_ROLE_MAP[roleKey] = [];
+  SFDC_ROLE_MAP[roleKey].push('');
+  renderFMTab();
+}
+
+function removeProfileMapping(roleKey, idx) {
+  if(SFDC_ROLE_MAP[roleKey]) {
+    SFDC_ROLE_MAP[roleKey].splice(idx, 1);
+    renderFMTab();
+  }
+}
+
+function saveN8NConfig() {
+  N8N_CONFIG.webhookUrl     = (el('fmN8NUrl')?.value||'').trim();
+  N8N_CONFIG.callbackSecret = (el('fmN8NSecret')?.value||'').trim();
+  N8N_CONFIG.enabled        = el('fmN8NEnabled')?.checked || false;
+  // Persist to localStorage so it survives page reloads
+  try {
+    localStorage.setItem('atlan_n8n_config', JSON.stringify({
+      webhookUrl: N8N_CONFIG.webhookUrl,
+      callbackSecret: N8N_CONFIG.callbackSecret,
+      enabled: N8N_CONFIG.enabled,
+    }));
+  } catch(e) {}
+  showToast('N8N config saved' + (N8N_CONFIG.enabled ? ' — webhooks active' : ' — disabled'), '#059669');
+  renderFMTab();
+}
+
+async function testN8NWebhook() {
+  var url = (el('fmN8NUrl')?.value||'').trim();
+  var res = el('fmN8NTestResult');
+  if(!url) { if(res) res.innerHTML='<span style="color:#D63B3B">No webhook URL set</span>'; return; }
+  if(res) res.innerHTML='<span style="color:#E89B00">⏳ Sending test payload…</span>';
+  try {
+    var r = await fetch(url, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ event:'test', source:'CPQ Field Mapping', ts: new Date().toISOString() }),
+    });
+    if(res) res.innerHTML = r.ok
+      ? '<span style="color:#059669">✓ Webhook responded with '+r.status+' — N8N received it</span>'
+      : '<span style="color:#D63B3B">✕ HTTP '+r.status+' — check N8N workflow is active</span>';
+  } catch(e) {
+    if(res) res.innerHTML='<span style="color:#D63B3B">✕ Network error: '+e.message+'</span>';
+  }
+}
+
+function saveFieldMapping() {
+  // Save N8N config
+  saveN8NConfig();
+  // Persist SFDC field maps to localStorage for admin review (runtime only — code is source of truth)
+  try {
+    localStorage.setItem('atlan_fm_note', JSON.stringify({
+      savedAt: new Date().toISOString(),
+      savedBy: SESSION_USER.name,
+      note: 'Field mapping changes are runtime-only. Update index.html SFDC_FIELD_MAP to persist across deployments.',
+    }));
+  } catch(e) {}
+  var s = el('fmSaveStatus');
+  if(s) { s.textContent = 'Saved ✓'; setTimeout(function(){ s.textContent=''; }, 3000); }
+  showToast('Field mapping saved — remember to update index.html for permanent changes', '#059669');
+}
+
+// Load persisted N8N config on startup
+(function loadN8NConfig() {
+  try {
+    var stored = localStorage.getItem('atlan_n8n_config');
+    if(stored) {
+      var cfg = JSON.parse(stored);
+      if(cfg.webhookUrl)     N8N_CONFIG.webhookUrl     = cfg.webhookUrl;
+      if(cfg.callbackSecret) N8N_CONFIG.callbackSecret = cfg.callbackSecret;
+      if(typeof cfg.enabled === 'boolean') N8N_CONFIG.enabled = cfg.enabled;
+    }
+  } catch(e) {}
+})();
+
 // ── INIT ──────────────────────────────────────────────────────────
 (function init(){
   if(!sfdcAuthGate()) return; // stop — auth gate is showing
@@ -5807,6 +6393,7 @@ function sfdcAuthGateConnect() {
   }catch(e){}
   // Auto-launch from URL params (e.g. launched from SFDC with ?oppId=...)
   try{ checkUrlParams(); }catch(e){}
+  try{ handleN8NCallback(); }catch(e){}
 })();
 
 // ═══════════════════════════════════════════════════════════════════
@@ -6109,9 +6696,11 @@ function acceptQuote() {
   changeQuoteStatus(snap.dealId, 'Accepted');
   state.quoteStatus = 'Accepted';
   state.quoteAcceptedAt = new Date().toISOString();
+  // Write accepted_by + accepted_at to SFDC
+  sfdcWriteStatusChange('Accepted', SESSION_USER.name, null).catch(function(){});
   updateOFButtons();
   renderQuotes();
-  showToast('Quote ' + snap.dealId + ' accepted — this is the final quote for this Opportunity','#00B87A');
+  showToast('Quote ' + snap.dealId + ' accepted — written to Salesforce','#00B87A');
 }
 
 function rejectQuote(dealId) {
@@ -6133,6 +6722,119 @@ function rejectQuote(dealId) {
 // ── URL param auto-launch ─────────────────────────────────────────
 // Supports: ?oppId=006Hs...&dealType=NB|UP|RN
 // Called from init() — opens new deal modal pre-filled if oppId is present
+// ═══════════════════════════════════════════════════════════════════
+// N8N WEBHOOK INTEGRATION
+// ═══════════════════════════════════════════════════════════════════
+
+// Fire on Submit — POSTs deal payload to N8N which sends Slack DM + Email
+async function n8nNotifySubmit(snap, tier, submittedBy) {
+  if(!N8N_CONFIG.enabled || !N8N_CONFIG.webhookUrl) return;
+  const{totalList,totalNet,disc} = getTotals();
+  const toolUrl = window.location.origin + window.location.pathname
+    + '?quoteId=' + encodeURIComponent(snap.dealId)
+    + '&sfdcQuoteId=' + encodeURIComponent(state.sfdcQuoteId||'')
+    + '&token=' + encodeURIComponent(N8N_CONFIG.callbackSecret);
+
+  const payload = {
+    event:          'quote_submitted',
+    quoteId:        snap.dealId,
+    sfdcQuoteId:    state.sfdcQuoteId || '',
+    sfdcOppId:      state.sfdcOppId || '',
+    company:        snap.legal || snap.company || '',
+    repName:        submittedBy,
+    tierLabel:      tier.label,
+    approverName:   tier.approver || '',
+    discountPct:    parseFloat(disc.toFixed(2)),
+    listARR:        Math.round(totalList),
+    netARR:         Math.round(totalNet),
+    discountReason: snap.discReason || '',
+    notes:          snap.notes || '',
+    toolUrl:        toolUrl,
+    callbackSecret: N8N_CONFIG.callbackSecret,
+    submittedAt:    new Date().toISOString(),
+  };
+
+  try {
+    const res = await fetch(N8N_CONFIG.webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if(!res.ok) sfdcLogError('N8N webhook failed: ' + res.status);
+  } catch(e) {
+    sfdcLogError('N8N webhook error: ' + (e.message||e));
+  }
+}
+
+// Handle inbound callback from N8N after approver acts in Slack
+// URL format: ?quoteId=xxx&status=approved&actor=Name&reason=...&token=xxx
+function handleN8NCallback() {
+  const params = new URLSearchParams(window.location.search);
+  const quoteId = params.get('quoteId');
+  const status  = params.get('status');   // 'approved' | 'rejected'
+  const actor   = params.get('actor') || '';
+  const reason  = params.get('reason') || '';
+  const token   = params.get('token') || '';
+
+  if(!quoteId || !status) return;
+  if(N8N_CONFIG.callbackSecret && token !== N8N_CONFIG.callbackSecret) {
+    console.warn('N8N callback: invalid token — ignoring');
+    return;
+  }
+
+  // Find and load the quote
+  const deal = deals.find(function(d){ return d.dealId === quoteId; });
+  if(!deal) return;
+
+  if(status === 'approved') {
+    // Update local state
+    deal.quoteStatus = 'Approved';
+    deal.approvals = deal.approvals || {};
+    deal.approvals['highest'] = {
+      status: 'approved',
+      approverName: actor,
+      email: actor,
+      approvedAt: new Date().toISOString(),
+      rejectionReason: '',
+    };
+    saveDeals(deals);
+    // Write to SFDC
+    if(deal.sfdcQuoteId) {
+      sfdcWriteStatusChange('Approved', actor, null).catch(function(){});
+    }
+    showToast('Quote ' + quoteId + ' approved by ' + (actor||'approver') + ' via Slack','#00B87A');
+  } else if(status === 'rejected') {
+    deal.quoteStatus = 'Rejected';
+    deal.approvals = deal.approvals || {};
+    deal.approvals['highest'] = {
+      status: 'rejected',
+      approverName: actor,
+      email: actor,
+      rejectedAt: new Date().toISOString(),
+      rejectionReason: reason,
+    };
+    saveDeals(deals);
+    if(deal.sfdcQuoteId) {
+      sfdcWriteStatusChange('Rejected', actor, {reason: reason}).catch(function(){});
+    }
+    showToast('Quote ' + quoteId + ' rejected by ' + (actor||'approver') + ': ' + reason,'#D63B3B');
+  }
+
+  renderQuotes();
+  renderDashboard();
+
+  // If this is the currently open quote, update live state too
+  if(state.dealId === quoteId) {
+    state.quoteStatus = deal.quoteStatus;
+    if(deal.approvals) state.approvals = deal.approvals;
+    renderApprovalStep();
+  }
+
+  // Clean up URL params so callback doesn't re-fire on reload
+  const cleanUrl = window.location.pathname;
+  window.history.replaceState({}, '', cleanUrl);
+}
+
 function checkUrlParams() {
   try {
     var params = new URLSearchParams(window.location.search);

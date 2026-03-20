@@ -4336,6 +4336,51 @@ async function sfdcReadBackApprovals() {
   if(!tok || !tok.access_token) return;
 
   try {
+    // ── Step 1: Always sync Quote.Status directly first ──────────────
+    // This handles status changes made directly in SFDC (not via Approval Process)
+    if(quoteId) {
+      const qRes = await sfdcApiCall(
+        '/services/data/v59.0/sobjects/Quote/' + quoteId +
+        '?fields=Status,Approved_By__c,Approved_At__c,Rejected_By__c,Rejected_At__c,Rejection_Reason__c,Submitted_By__c,Submitted_At__c',
+        'GET'
+      );
+      if(qRes && qRes.Status) {
+        const sfStatus = qRes.Status;
+        // Map SFDC Quote.Status → tool quoteStatus
+        const statusMap = {
+          'Draft':           'Draft',
+          'In Review':       'In Review',
+          'Approved':        'Approved',
+          'Rejected':        'Rejected',
+          'Accepted':        'Accepted',
+        };
+        const toolStatus = statusMap[sfStatus] || sfStatus;
+
+        if(toolStatus !== state.quoteStatus) {
+          state.quoteStatus = toolStatus;
+          // Update approval state from Quote fields
+          if(!state.approvals['highest']) state.approvals['highest'] = {status:'',email:'',rejectionReason:''};
+          if(sfStatus === 'Approved') {
+            state.approvals['highest'].status       = 'approved';
+            state.approvals['highest'].approverName = qRes.Approved_By__c || '';
+            state.approvals['highest'].approvedAt   = qRes.Approved_At__c || '';
+          } else if(sfStatus === 'Rejected') {
+            state.approvals['highest'].status          = 'rejected';
+            state.approvals['highest'].approverName    = qRes.Rejected_By__c || '';
+            state.approvals['highest'].rejectedAt      = qRes.Rejected_At__c || '';
+            state.approvals['highest'].rejectionReason = qRes.Rejection_Reason__c || '';
+          } else if(sfStatus === 'In Review') {
+            state.approvals['highest'].status = 'pending';
+          }
+          saveDeal();
+          renderCPQ();
+          showToast('Quote status synced from Salesforce: ' + toolStatus, '#00B87A');
+          return;
+        }
+      }
+    }
+
+    // ── Step 2: Try ProcessInstance (SFDC native Approval Process) ───
     // Query ProcessInstance records for this Quote (or Opp as fallback)
     const targetId = quoteId || oppId;
     const soql = 'SELECT Id, Status, CreatedDate, SubmittedById,' +

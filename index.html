@@ -723,7 +723,7 @@ textarea{resize:vertical;min-height:60px}
         💡 When a rep checks one of these terms in their deal, the specified approver must approve it separately from the discount approval.
       </div>
       <table class="matrix-table" id="nstMatrixTable">
-        <thead><tr><th>#</th><th>Term Label</th><th>Description / Hint</th><th>Approver Required</th><th>Color</th><th></th></tr></thead>
+        <thead><tr><th>#</th><th>Term Label</th><th>Description / Hint</th><th>Resolution</th><th>Fixed Person (name · email)</th><th>Color</th><th></th></tr></thead>
         <tbody id="nstMatrixBody"></tbody>
       </table>
       <div style="margin-top:14px;padding:12px;background:#FFF8E1;border:1px solid #FFE082;border-radius:var(--rs);font-size:12px;color:#B45309">
@@ -2031,9 +2031,12 @@ function saveMatrixToStorage(tiers){ localStorage.setItem('atlan_cpq_matrix',JSO
 // ── Non-Standard Terms (NST) — configurable from Approval Matrix page ──
 const NST_STORAGE_KEY='atlan_cpq_nst_terms';
 const DEFAULT_NST_TERMS=[
-  {key:'rmv_mkt',   label:'Remove Marketing / Logo Terms',   hint:'Removes Ambassador Program language from OF', approver:'BAM + Jim (CRO)',          color:'#7B2FBE'},
-  {key:'rmv_renew', label:'Remove Auto-Renewal',             hint:'Applies manual renewal language to OF',       approver:'Jim (CRO)',                  color:'#D63B3B'},
-  {key:'rmv_uplift',label:'Remove Price Uplift / Escalation',hint:'Removes Annual Subscription Fees Escalation',approver:'BAM / Sales Leadership',      color:'#E89B00'},
+  // NST approvers use the same resolution model as APPROVAL_TIERS.
+  // approverLevels: array of resolution keys — can require MULTIPLE approvers.
+  // resolution keys: 'skip_manager' = skip-level (BAM/VP NAM), 'fixed' = named person
+  {key:'rmv_mkt',    label:'Remove Marketing / Logo Terms',    hint:'Removes Ambassador Program language from OF',    approverLevels:['skip_manager','fixed'], fixedName:'Jim (CRO)',  fixedEmail:'jim@atlan.com',  approver:'BAM + Jim (CRO)',          color:'#7B2FBE'},
+  {key:'rmv_renew',  label:'Remove Auto-Renewal',              hint:'Applies manual renewal language to OF',          approverLevels:['fixed'],               fixedName:'Jim (CRO)',  fixedEmail:'jim@atlan.com',  approver:'Jim (CRO)',                color:'#D63B3B'},
+  {key:'rmv_uplift', label:'Remove Price Uplift / Escalation', hint:'Removes Annual Subscription Fees Escalation',    approverLevels:['skip_manager'],         fixedName:'',           fixedEmail:'',               approver:'BAM / Sales Leadership',   color:'#E89B00'},
 ];
 function loadNSTTerms(){ try{return JSON.parse(localStorage.getItem(NST_STORAGE_KEY)||'null')||JSON.parse(JSON.stringify(DEFAULT_NST_TERMS));}catch(e){return JSON.parse(JSON.stringify(DEFAULT_NST_TERMS));}}
 function saveNSTTerms(t){ localStorage.setItem(NST_STORAGE_KEY,JSON.stringify(t)); }
@@ -5265,18 +5268,51 @@ function renderApprovalMatrix(){
 
   // ── NST table ──────────────────────────────────────────────────────
   if(el('nstMatrixBody')) el('nstMatrixBody').innerHTML = NST_TERMS.length
-    ? NST_TERMS.map((t,i)=>`<tr>
-        <td style="color:var(--faint);font-size:11px">${i+1}</td>
-        <td><input class="matrix-name-input" value="${escHtml(t.label)}" onchange="NST_TERMS[${i}].label=this.value" style="width:190px"/></td>
-        <td><input class="matrix-name-input" value="${escHtml(t.hint||'')}" onchange="NST_TERMS[${i}].hint=this.value" style="width:240px;font-size:11px;color:var(--muted)"/></td>
-        <td><input class="matrix-name-input" value="${escHtml(t.approver)}" onchange="NST_TERMS[${i}].approver=this.value" style="width:180px"/></td>
-        <td><div style="display:flex;align-items:center;gap:7px">
-          <input type="color" value="${t.color||'#D63B3B'}" onchange="NST_TERMS[${i}].color=this.value;renderApprovalMatrix()" style="width:36px;height:28px;padding:2px;border:1px solid var(--border);border-radius:4px;cursor:pointer"/>
-          <span style="width:14px;height:14px;border-radius:3px;display:inline-block;background:${t.color||'#D63B3B'}"></span>
-        </div></td>
-        <td><button onclick="removeNSTTerm(${i})" style="padding:3px 9px;border-radius:var(--rs);font-size:11px;cursor:pointer;border:1px solid #FECACA;color:#D63B3B;background:#FEF2F2">✕</button></td>
-      </tr>`).join('')
-    : '<tr><td colspan="6" style="text-align:center;color:var(--faint);padding:16px;font-size:12px">No non-standard terms configured. Click + Add Term to create one.</td></tr>';
+    ? NST_TERMS.map(function(t,i){
+        var resolved = resolveNSTApprovers(t);
+        var resolvedLabel = resolved.map(function(r){
+          if(r.source==='sfdc_manager'||r.source==='sfdc_skip_manager'||r.source==='sfdc_manager_emea')
+            return '<span style="color:#059669;font-size:10.5px">&#10003; '+escHtml(r.name)+'</span>';
+          if(r.source==='fallback')
+            return '<span style="color:#E89B00;font-size:10.5px">&#9888; '+escHtml(r.name||'?')+'</span>';
+          return '<span style="font-size:10.5px;color:var(--muted)">'+escHtml(r.name||'&#8212;')+'</span>';
+        }).join(' <span style="color:var(--muted)">+</span> ');
+
+        var levSel = (t.approverLevels||['fixed']).map(function(lv,li){
+          var resoOpts = ['manager','skip_manager','fixed'].map(function(o){
+            var labels={manager:'Direct manager',skip_manager:'Skip-level (BAM/VP)',fixed:'Fixed person'};
+            return '<option value="'+o+'"'+(lv===o?' selected':'')+'>'+labels[o]+'</option>';
+          }).join('');
+          return '<div style="display:flex;align-items:center;gap:4px;margin-bottom:3px">'
+            +'<select class="fm-scope-select" style="flex:1;font-size:10.5px" onchange="updateNSTLevel('+i+','+li+',this.value);saveNSTTerms(NST_TERMS);renderApprovalMatrix()">'+resoOpts+'</select>'
+            +(li>0?'<button onclick="removeNSTLevel('+i+','+li+')" style="padding:1px 6px;font-size:10px;border:1px solid #FECACA;color:#D63B3B;background:#FEF2F2;border-radius:4px;cursor:pointer">&#8722;</button>':'')
+          +'</div>';
+        }).join('');
+
+        var hasFixed = (t.approverLevels||[]).includes('fixed');
+        return '<tr>'
+          +'<td style="color:var(--faint);font-size:11px;vertical-align:top;padding-top:10px">'+(i+1)+'</td>'
+          +'<td style="vertical-align:top"><input class="matrix-name-input" value="'+escHtml(t.label)+'" onchange="NST_TERMS['+i+'].label=this.value" style="width:160px"/></td>'
+          +'<td style="vertical-align:top"><input class="matrix-name-input" value="'+escHtml(t.hint||'')+'" onchange="NST_TERMS['+i+'].hint=this.value" style="width:190px;font-size:11px;color:var(--muted)"/></td>'
+          +'<td style="vertical-align:top">'
+            +levSel
+            +'<button onclick="addNSTLevel('+i+')" style="font-size:10px;padding:2px 8px;border:1px dashed var(--border);background:transparent;border-radius:4px;cursor:pointer;color:var(--muted);margin-top:2px">+ add approver</button>'
+            +'<div style="margin-top:5px">'+resolvedLabel+'</div>'
+          +'</td>'
+          +'<td style="vertical-align:top">'
+            +(hasFixed
+              ? '<input class="matrix-name-input" value="'+escHtml(t.fixedName||'')+'" placeholder="Name" onchange="NST_TERMS['+i+'].fixedName=this.value" style="width:95px;margin-bottom:3px"/>'
+                +'<br><input class="matrix-name-input" value="'+escHtml(t.fixedEmail||'')+'" placeholder="email@atlan.com" onchange="NST_TERMS['+i+'].fixedEmail=this.value" style="width:155px;font-size:11px"/>'
+              : '<span style="font-size:11px;color:var(--muted);font-style:italic">from SFDC chain</span>')
+          +'</td>'
+          +'<td style="vertical-align:top"><div style="display:flex;align-items:center;gap:6px;padding-top:4px">'
+            +'<input type="color" value="'+(t.color||'#D63B3B')+'" onchange="NST_TERMS['+i+'].color=this.value;renderApprovalMatrix()" style="width:36px;height:28px;padding:2px;border:1px solid var(--border);border-radius:4px;cursor:pointer"/>'
+            +'<span style="width:14px;height:14px;border-radius:3px;display:inline-block;background:'+(t.color||'#D63B3B')+'"></span>'
+          +'</div></td>'
+          +'<td style="vertical-align:top;padding-top:6px"><button onclick="removeNSTTerm('+i+')" style="padding:3px 9px;border-radius:var(--rs);font-size:11px;cursor:pointer;border:1px solid #FECACA;color:#D63B3B;background:#FEF2F2">&#10005;</button></td>'
+        +'</tr>';
+      }).join('')
+    : '<tr><td colspan="7" style="text-align:center;color:var(--faint);padding:16px;font-size:12px">No non-standard terms configured. Click + Add Term to create one.</td></tr>';
 }
 function updateMatrixRow(i,field,val){
   if(field==='max') APPROVAL_TIERS[i].max=parseFloat(val)||0;
@@ -5293,13 +5329,29 @@ function removeMatrixTier(i){
   renderApprovalMatrix();
 }
 function addNSTTerm(){
-  NST_TERMS.push({key:'nst_'+Date.now(),label:'New Term',hint:'Describe when this applies',approver:'Approver Name',color:'#7B2FBE'});
+  NST_TERMS.push({key:'nst_'+Date.now(),label:'New Term',hint:'Describe when this applies',approverLevels:['fixed'],fixedName:'',fixedEmail:'',approver:'',color:'#7B2FBE'});
   renderApprovalMatrix();
 }
 function removeNSTTerm(i){
   if(!confirm('Remove "'+NST_TERMS[i].label+'"?')) return;
   NST_TERMS.splice(i,1);
   saveNSTTerms(NST_TERMS);
+  renderApprovalMatrix();
+}
+function updateNSTLevel(termIdx, levelIdx, newVal) {
+  if(!NST_TERMS[termIdx].approverLevels) NST_TERMS[termIdx].approverLevels = ['fixed'];
+  NST_TERMS[termIdx].approverLevels[levelIdx] = newVal;
+}
+function addNSTLevel(termIdx) {
+  if(!NST_TERMS[termIdx].approverLevels) NST_TERMS[termIdx].approverLevels = [];
+  NST_TERMS[termIdx].approverLevels.push('fixed');
+  renderApprovalMatrix();
+}
+function removeNSTLevel(termIdx, levelIdx) {
+  if((NST_TERMS[termIdx].approverLevels||[]).length <= 1) {
+    showToast('At least one approver level required','#D63B3B'); return;
+  }
+  NST_TERMS[termIdx].approverLevels.splice(levelIdx, 1);
   renderApprovalMatrix();
 }
 function saveNSTMatrix(ev){
@@ -6095,6 +6147,38 @@ function sfdcAuthGateConnect() {
       btn.disabled = false;
     }
   });
+}
+
+// ── NST approver resolution ──────────────────────────────────────
+// NST terms can require multiple approvers (e.g. BAM + Jim).
+// approverLevels is an array — one entry per required approver.
+function resolveNSTApprovers(nstTerm) {
+  var levels = nstTerm.approverLevels || ['fixed'];
+  return levels.map(function(res) {
+    if(res === 'manager') {
+      return SESSION_USER.managerName
+        ? { name: SESSION_USER.managerName, email: SESSION_USER.managerEmail, source: 'sfdc_manager' }
+        : { name: nstTerm.fixedName || '', email: nstTerm.fixedEmail || '', source: 'fallback' };
+    }
+    if(res === 'skip_manager') {
+      // EMEA: skip-level = same as direct manager (Andrew is both RSD and VP equivalent)
+      if(SESSION_USER.isEMEA) return { name: SESSION_USER.managerName || '', email: SESSION_USER.managerEmail || '', source: 'sfdc_manager_emea' };
+      return SESSION_USER.skipManagerName
+        ? { name: SESSION_USER.skipManagerName, email: SESSION_USER.skipManagerEmail, source: 'sfdc_skip_manager' }
+        : { name: nstTerm.fixedName || '', email: nstTerm.fixedEmail || '', source: 'fallback' };
+    }
+    // fixed — named person (Jim, Bradley, etc.)
+    return { name: nstTerm.fixedName || nstTerm.approver || '', email: nstTerm.fixedEmail || '', source: 'fixed' };
+  });
+}
+
+function getNSTApproverLabel(nstTerm) {
+  var resolved = resolveNSTApprovers(nstTerm);
+  return resolved.map(function(r) {
+    if(r.source === 'sfdc_manager' || r.source === 'sfdc_skip_manager' || r.source === 'sfdc_manager_emea')
+      return r.name + ' \u2713';
+    return r.name || '\u2014';
+  }).filter(Boolean).join(' + ');
 }
 
 // ── FIELD MAPPING ────────────────────────────────────────────────

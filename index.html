@@ -4995,7 +4995,7 @@ async function sfdcWriteDraftStepOne() {
     Status:         'Draft',
     Description:    snap.notes || '',
     ExpirationDate: snap.endDate || undefined,
-    Discount:       parseFloat(disc.toFixed(2)),
+    // Note: standard Quote.Discount is read-only in SFDC — we store discount in Discount_Tier__c instead
   };
 
   // Custom fields
@@ -5131,7 +5131,7 @@ async function sfdcCreateQuoteRecord(snap, oppId, totalNet, totalList, disc) {
       saveDeal();
      } else if(!state.sfdcQuoteId) {
        // Fetch the Quote id by external id — build SOQL cleanly
-       const fallbackSoql = 'SELECT Id FROM Quote WHERE '+F('quote','externalId')+'=' + JSON.stringify(snap.dealId) + ' LIMIT 1';
+       const fallbackSoql = 'SELECT Id FROM Quote WHERE ' + F('quote','externalId') + '=\'' + snap.dealId + '\' LIMIT 1';
        const qRes = await sfdcApiCall(
          '/services/data/v59.0/query?q='+encodeURIComponent(fallbackSoql), 'GET'
        );
@@ -5177,8 +5177,10 @@ async function sfdcPushQuoteLineItems(quoteId, items) {
       Quantity:    item.qty || 1,
       UnitPrice:   Math.round(unitPrice),
       ListPrice:   Math.round(listPrice),
-      Discount:    disc,
+      // Discount % on QuoteLineItem — may be read-only depending on org settings
+      // Only include if UnitPrice < ListPrice to avoid INVALID_FIELD errors
     };
+    if(disc > 0 && disc < 100) linePayload.Discount = parseFloat(disc.toFixed(2));
 
     // Step 1: Try product map (fast — no extra API call)
     const pbe = resolvePricebookEntry(item);

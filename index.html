@@ -4713,61 +4713,107 @@ async function sfdcConnect() {
 // Opens a Salesforce login popup → user logs in → token returned via postMessage.
 function sfdcOAuthPopup(instanceUrl, clientId) {
   return new Promise(function(resolve, reject) {
-    // Always use the exact Callback URL registered in the Connected App
-    // Must match character-for-character — no trailing slash
     var redirectUri = 'https://harshshah1592.github.io/atlan-cpq';
-    var authUrl = instanceUrl + '/services/oauth2/authorize'
-      + '?response_type=token'
-      + '&client_id=' + encodeURIComponent(clientId)
-      + '&redirect_uri=' + encodeURIComponent(redirectUri)
-      + '&scope=' + encodeURIComponent('api refresh_token offline_access')
-      + '&prompt=login';
 
-    var popup = window.open(authUrl, 'sfdcOAuth',
-      'width=600,height=700,scrollbars=yes,resizable=yes');
+    // PKCE: generate code verifier and challenge
+    var arr = new Uint8Array(32);
+    crypto.getRandomValues(arr);
+    var codeVerifier = btoa(String.fromCharCode.apply(null, arr))
+      .replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
 
-    if(!popup) {
-      reject(new Error('Popup blocked — allow popups for this site and try again'));
-      return;
-    }
+    crypto.subtle.digest('SHA-256', new TextEncoder().encode(codeVerifier))
+    .then(function(hashBuf) {
+      var codeChallenge = btoa(String.fromCharCode.apply(null, new Uint8Array(hashBuf)))
+        .replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
+      var state = Math.random().toString(36).substring(2);
 
-    // Poll the popup URL for the access_token fragment
-    var poll = setInterval(function() {
-      try {
-        if(!popup || popup.closed) {
-          clearInterval(poll);
-          reject(new Error('Popup closed before completing login'));
-          return;
-        }
-        var href = popup.location.href;
-        if(href && href.indexOf('access_token=') !== -1) {
-          clearInterval(poll);
-          popup.close();
-          // Parse token from URL fragment
-          var fragment = href.split('#')[1] || href.split('?')[1] || '';
-          var params = {};
-          fragment.split('&').forEach(function(p) {
-            var kv = p.split('=');
-            params[decodeURIComponent(kv[0])] = decodeURIComponent(kv[1]||'');
-          });
-          if(params.access_token) {
-            resolve(params);
-          } else {
-            reject(new Error('No access token in response'));
-          }
-        }
-      } catch(e) {
-        // Cross-origin error while popup is on SFDC domain — normal, keep polling
+      // Store verifier in parent window's sessionStorage — the popup will reload
+      // the tool page with ?code=xxx in the URL, and the tool startup code
+      // detects this and posts the code back to the opener then closes itself
+      sessionStorage.setItem('sfdc_cv', codeVerifier);
+      sessionStorage.setItem('sfdc_st', state);
+      sessionStorage.setItem('sfdc_inst', instanceUrl);
+      sessionStorage.setItem('sfdc_cid', clientId);
+
+      var authUrl = instanceUrl + '/services/oauth2/authorize'
+        + '?response_type=code'
+        + '&client_id='              + encodeURIComponent(clientId)
+        + '&redirect_uri='           + encodeURIComponent(redirectUri)
+        + '&scope='                  + encodeURIComponent('api refresh_token offline_access')
+        + '&state='                  + encodeURIComponent(state)
+        + '&code_challenge='         + encodeURIComponent(codeChallenge)
+        + '&code_challenge_method=S256'
+        + '&prompt=login';
+
+      var popup = window.open(authUrl, 'sfdcOAuth', 'width=600,height=700,scrollbars=yes,resizable=yes');
+      if(!popup) { reject(new Error('Popup blocked — allow popups for this site and try again')); return; }
+
+      // Listen for postMessage from the popup (sent after redirect lands on tool page)
+      function onMessage(event) {
+        if(event.origin !== 'https://harshshah1592.github.io') return;
+        if(!event.data || event.data.type !== 'sfdc_oauth_code') return;
+        window.removeEventListener('message', onMessage);
+        clearTimeout(timer);
+        if(event.data.error) { reject(new Error(event.data.error)); return; }
+        if(event.data.state !== state) { reject(new Error('State mismatch — possible CSRF')); return; }
+        var code = event.data.code;
+        var cv = sessionStorage.getItem('sfdc_cv');
+        sessionStorage.removeItem('sfdc_cv'); sessionStorage.removeItem('sfdc_st');
+        sessionStorage.removeItem('sfdc_inst'); sessionStorage.removeItem('sfdc_cid');
+        // Exchange code for token
+        fetch(instanceUrl + '/services/oauth2/token', {
+          method: 'POST',
+          headers: {'Content-Type':'application/x-www-form-urlencoded'},
+          body: new URLSearchParams({
+            grant_type: 'authorization_code',
+            client_id: clientId,
+            redirect_uri: redirectUri,
+            code: code,
+            code_verifier: cv,
+          }).toString()
+        })
+        .then(function(r){ return r.json(); })
+        .then(function(tok) {
+          if(tok.access_token) { resolve(tok); }
+          else { reject(new Error('Token exchange failed: ' + (tok.error_description || tok.error || JSON.stringify(tok)))); }
+        })
+        .catch(reject);
       }
-    }, 300);
+      window.addEventListener('message', onMessage);
 
-    // Timeout after 3 minutes
-    setTimeout(function() {
-      clearInterval(poll);
-      if(!popup.closed) popup.close();
-      reject(new Error('Login timed out — please try again'));
-    }, 180000);
+      var timer = setTimeout(function() {
+        window.removeEventListener('message', onMessage);
+        if(!popup.closed) popup.close();
+        reject(new Error('Login timed out — please try again'));
+      }, 180000);
+    });
   });
+}
+
+// Called on page load — if this page was opened as an OAuth callback popup,
+// send the code back to the opener and close immediately
+function sfdcHandleOAuthCallback() {
+  var params = new URLSearchParams(window.location.search);
+  var code  = params.get('code');
+  var state = params.get('state');
+  var error = params.get('error');
+  if(!code && !error) return false; // not a callback — normal load
+  // This is the popup landing after SFDC redirect
+  if(window.opener) {
+    window.opener.postMessage({
+      type:  'sfdc_oauth_code',
+      code:  code  || null,
+      state: state || null,
+      error: error ? (params.get('error_description') || error) : null,
+    }, 'https://harshshah1592.github.io');
+    // Clear the code from URL then close
+    window.history.replaceState({}, '', window.location.pathname);
+    window.close();
+    return true;
+  }
+  // Opened directly (not as popup) — clear params and continue normal load
+  window.history.replaceState({}, '', window.location.pathname);
+  return false;
 }
 
 async function sfdcFetchToken(creds) {
@@ -6973,6 +7019,10 @@ function saveFieldMapping() {
 
 // ── INIT ──────────────────────────────────────────────────────────
 (function init(){
+  // Handle OAuth callback FIRST — if this is the popup after SFDC redirect,
+  // send code to opener and close. Must run before anything else.
+  if(sfdcHandleOAuthCallback()) return;
+
   if(!sfdcAuthGate()) return; // stop — auth gate is showing
   try{ pricingConfig=loadPricingConfig(); applyPricingConfig(pricingConfig); renderSidebarUser(); showView('dashboard'); }catch(e){ console.error('Init error:',e); }
   document.addEventListener('input', ()=>{ try{ navUpdate(); }catch(e){} });

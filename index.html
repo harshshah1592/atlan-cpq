@@ -4808,6 +4808,123 @@ async function sfdcTestConnection() {
 }
 
 // ── Create / upsert a native SFDC Quote record for this quote ──
+// ── Write Draft record to SFDC when rep leaves the Summary step ───
+// Fires when rep clicks Next on step 5 (Pricing Summary).
+// At this point we have complete pricing data so we write everything:
+// company/contact/billing, ARR, discount, line items, deal details.
+async function sfdcWriteDraftStepOne() {
+  const tok = sfdcLoadToken ? sfdcLoadToken() : null;
+  if(!tok || !tok.access_token) return; // not connected — silent skip
+
+  const oppId = state.sfdcOppId;
+  if(!oppId) return;
+
+  const snap = saveDeal();
+  const {totalList, totalNet, disc, items} = getTotals();
+  const tier = getTier(disc);
+
+  // ── 1. Upsert the Quote record as Draft with full pricing data ───
+  const quotePayload = {
+    OpportunityId:  oppId,
+    Name:           snap.quoteName || ((snap.legal||'Draft') + ' — v' + (snap.quoteVersion||1)),
+    Status:         'Draft',
+    Description:    snap.notes || '',
+    ExpirationDate: snap.endDate || undefined,
+    Discount:       parseFloat(disc.toFixed(2)),
+  };
+
+  // Custom fields
+  quotePayload[F('quote','externalId')]    = snap.dealId;
+  quotePayload[F('quote','version')]       = snap.quoteVersion || 1;
+  quotePayload[F('quote','listPriceARR')]  = Math.round(totalList);
+  quotePayload[F('quote','proposedARR')]   = Math.round(totalNet);
+  quotePayload[F('quote','discountTier')]  = tier.label;
+  quotePayload[F('quote','discountReason')]= snap.discReason || '';
+  if(snap.competitor)   quotePayload[F('quote','competitor')]   = snap.competitor;
+  if(snap.dealDeskFlag) quotePayload[F('quote','dealDeskFlag')] = true;
+
+  try {
+    const res = await sfdcApiCall(
+      '/services/data/v59.0/sobjects/Quote/' + F('quote','externalId') + '/' + encodeURIComponent(snap.dealId),
+      'PATCH', quotePayload
+    );
+    if(res && res.id) {
+      state.sfdcQuoteId = res.id;
+      saveDeal();
+    } else if(!state.sfdcQuoteId) {
+      const qRes = await sfdcApiCall(
+        '/services/data/v59.0/query?q=' +
+        encodeURIComponent('SELECT Id FROM Quote WHERE ' + F('quote','externalId') + '=\'' + snap.dealId + '\' LIMIT 1'),
+        'GET'
+      );
+      if(qRes && qRes.records && qRes.records[0]) {
+        state.sfdcQuoteId = qRes.records[0].Id;
+        saveDeal();
+      }
+    }
+  } catch(e) {
+    sfdcLogError('Draft Quote write failed: ' + (e.message||e));
+    return;
+  }
+
+  // ── 2. Write line items to QuoteLineItem ─────────────────────────
+  if(state.sfdcQuoteId && items.length) {
+    await sfdcPushQuoteLineItems(state.sfdcQuoteId, items);
+  }
+
+  // ── 3. Mirror Draft status to Opportunity ────────────────────────
+  try {
+    const oppPatch = {};
+    oppPatch[F('oppWrite','approvalStatus')] = 'Not Submitted';
+
+    // Write back any contact/billing details rep may have filled in
+    // Only writes to Opp Description if currently blank
+    if(snap.contact || snap.email || snap.billing) {
+      const oppRead = await sfdcApiCall(
+        '/services/data/v59.0/sobjects/Opportunity/' + oppId + '?fields=Description',
+        'GET'
+      );
+      if(oppRead && !oppRead.Description) {
+        oppPatch.Description = [
+          snap.contact ? 'Contact: '  + snap.contact  : '',
+          snap.email   ? 'Email: '    + snap.email    : '',
+          snap.billing ? 'Billing: '  + snap.billing  : '',
+        ].filter(Boolean).join('\n');
+      }
+    }
+
+    await sfdcApiCall('/services/data/v59.0/sobjects/Opportunity/' + oppId, 'PATCH', oppPatch);
+  } catch(e) { /* silent */ }
+
+  // ── 4. Create OpportunityContactRole if not already there ────────
+  if(snap.contact && snap.email) {
+    try {
+      const conRes = await sfdcApiCall(
+        '/services/data/v59.0/query?q=' +
+        encodeURIComponent('SELECT Id FROM Contact WHERE Email=\'' + snap.email.replace(/'/g,"\\'") + '\' LIMIT 1'),
+        'GET'
+      );
+      if(conRes && conRes.records && conRes.records[0]) {
+        const conId = conRes.records[0].Id;
+        const roleRes = await sfdcApiCall(
+          '/services/data/v59.0/query?q=' +
+          encodeURIComponent('SELECT Id FROM OpportunityContactRole WHERE OpportunityId=\'' + oppId + '\' AND ContactId=\'' + conId + '\' LIMIT 1'),
+          'GET'
+        );
+        if(roleRes && (!roleRes.records || !roleRes.records.length)) {
+          await sfdcApiCall('/services/data/v59.0/sobjects/OpportunityContactRole', 'POST', {
+            OpportunityId: oppId,
+            ContactId:     conId,
+            IsPrimary:     true,
+            Role:          'Decision Maker',
+          });
+        }
+      }
+    } catch(e) { /* best-effort — silent fail */ }
+  }
+}
+
+
 async function sfdcCreateQuoteRecord(snap, oppId, totalNet, totalList, disc) {
   const tier = getTier(disc);
   // All governance fields live on Quote — use standard fields where they exist
@@ -5512,7 +5629,7 @@ function buildPane0(){
       <!-- Quote name + version banner -->
       <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:#F0F9FF;border:1px solid #BAE6FD;border-radius:var(--rs);margin-bottom:12px">
         <div style="font-family:var(--mono);font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:#1B5FC4;color:#fff;flex-shrink:0">v${state.quoteVersion||1}</div>
-        <input type="text" id="f_quoteName" value="${escHtml(state.quoteName||'')}" placeholder="Quote name (e.g. Acme — v1)" oninput="state.quoteName=this.value" style="flex:1;padding:5px 8px;border:1px solid #BAE6FD;border-radius:4px;font-size:12px;background:#fff;color:#0B1829"/>
+        <input type="text" id="f_quoteName" value="${escHtml(state.quoteName||'')}" placeholder="Quote name (e.g. Acme — v1)" oninput="state.quoteName=this.value;this.dataset.manuallyEdited='1'" style="flex:1;padding:5px 8px;border:1px solid #BAE6FD;border-radius:4px;font-size:12px;background:#fff;color:#0B1829"/>
         <div style="font-size:10px;color:#5A7A8A;white-space:nowrap">Opp: <span style="font-family:var(--mono);font-weight:600">${escHtml(state.sfdcOppId||'—')}</span></div>
         ${(getQuotesForOpp(state.sfdcOppId||'').length > 1)
           ? '<div style="font-size:10px;color:#E89B00;white-space:nowrap">'+getQuotesForOpp(state.sfdcOppId||'').length+' quotes on this Opp</div>'
@@ -5522,10 +5639,15 @@ function buildPane0(){
         <label class="lbl">Rep Name</label>
         <input type="text" id="f_repName" value="${state.repName||''}" placeholder="Your name"/>
       </div>
-      <div class="sub-lbl">Company Details</div>
+      <div class="sub-lbl">Company Details
+        ${state.legal || state.billing || state.contact
+          ? '<span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;background:#DCFCE7;color:#166534;margin-left:8px">&#10003; Pre-filled from Salesforce</span>'
+          : '<span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;background:#FEF3C7;color:#B45309;margin-left:8px">&#9888; Not found in Salesforce — enter below</span>'}
+      </div>
+      ${(!state.legal || !state.contact || !state.email) ? '<div style="padding:10px 12px;background:#FEF3C7;border:1px solid #FDE68A;border-radius:8px;font-size:12px;color:#92400E;margin-bottom:12px">Some details weren\'t found in Salesforce. Fill them in below — they\'ll be written to Salesforce when you reach the Pricing Summary.</div>' : ''}
       <div class="g2">
         <div class="field"><label class="lbl">Legal Company Name<span class="req">*</span></label>
-          <input type="text" id="f_legal" value="${state.legal||''}" placeholder="Acme Corp Ltd." oninput="navUpdate()" ${isUP?'disabled':''}/></div>
+          <input type="text" id="f_legal" value="${state.legal||''}" placeholder="Acme Corp Ltd." oninput="navUpdate();if(this.value&&!el('f_quoteName')?.dataset.manuallyEdited){var v=state.quoteVersion||1;state.quoteName=this.value+' \u2014 v'+v;var qn=el('f_quoteName');if(qn)qn.value=state.quoteName;}" ${isUP?'disabled':''}/></div>
         <div class="field"><label class="lbl">Billing Address<span class="req">*</span></label>
           <input type="text" id="f_billing" value="${state.billing||''}" placeholder="123 Main St, City" ${isUP?'disabled':''}/></div>
         <div class="field"><label class="lbl">Primary Contact<span class="req">*</span></label>
@@ -6098,7 +6220,30 @@ function stepNext(){
     showView('dashboard');
     return;
   }
-  if(canAdvance()&&step<TOTAL_STEPS-1){step++;renderCPQ();}
+  if(!canAdvance()) return;
+
+  // When leaving step 5 (Summary) — write full Draft record to SFDC
+  // At this point rep has reviewed all pricing so we have complete data
+  // to write: line items, ARR, discount, contact details etc.
+  if(step === 5) {
+    saveDeal();
+    step++;
+    renderCPQ();
+    // Show brief indicator
+    var btn = el('btnNext');
+    if(btn) { btn.textContent = '↑ Saving to Salesforce…'; btn.style.background = '#059669'; }
+    sfdcWriteDraftStepOne().then(function() {
+      var b = el('btnNext');
+      if(b) { b.textContent = step===TOTAL_STEPS-1?'Save & Close':'Next →'; b.style.background = ''; }
+      showToast('Draft saved to Salesforce ✓','#059669');
+    }).catch(function(){
+      var b = el('btnNext');
+      if(b) { b.textContent = step===TOTAL_STEPS-1?'Save & Close':'Next →'; b.style.background = ''; }
+    });
+    return;
+  }
+
+  if(step < TOTAL_STEPS-1){ step++; renderCPQ(); }
 }
 
 function goStep(i){ flushStateFromDOM(); if(i<=step||i===step+1){step=i;renderCPQ();} }
@@ -7256,18 +7401,138 @@ function checkUrlParams() {
     var oppId = params.get('oppId') || params.get('opp_id');
     var dealTypeParam = (params.get('dealType') || params.get('deal_type') || 'NB').toUpperCase();
     if(!oppId) return;
-    // Open modal and pre-fill Opp ID
-    openDealTypeModal();
-    setTimeout(function() {
-      var oppEl = el('f_sfdcOppId');
-      if(oppEl) {
-        oppEl.value = oppId;
-        // This triggers the auto-fetch — validateSfdcOpp fires the SFDC query
-        validateSfdcOpp();
+
+    var dt = ['NB','UP','RN'].includes(dealTypeParam) ? dealTypeParam : 'NB';
+
+    // Clean the URL immediately so a refresh doesn't re-trigger
+    window.history.replaceState({}, '', window.location.pathname);
+
+    // Show a full-screen loading overlay while we fetch Opp data
+    var overlay = document.createElement('div');
+    overlay.id = 'oppAutoLoadOverlay';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:9000;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px';
+    overlay.innerHTML = '<div style="font-size:28px;font-weight:700;color:var(--text)">Opening CPQ</div>'
+      +'<div style="font-size:13px;color:var(--muted)" id="oppAutoLoadMsg">Fetching Opportunity data from Salesforce…</div>'
+      +'<div style="width:200px;height:3px;background:var(--border);border-radius:2px;overflow:hidden;margin-top:4px">'
+        +'<div id="oppAutoLoadBar" style="height:100%;width:0%;background:#3154C4;border-radius:2px;transition:width .4s ease"></div>'
+      +'</div>'
+      +'<div style="font-size:11px;color:var(--muted);margin-top:4px;font-family:monospace">Opp: '+escHtml(oppId)+'</div>';
+    document.body.appendChild(overlay);
+
+    function setMsg(msg, pct) {
+      var msgEl = document.getElementById('oppAutoLoadMsg');
+      var barEl = document.getElementById('oppAutoLoadBar');
+      if(msgEl) msgEl.textContent = msg;
+      if(barEl) barEl.style.width = (pct||0) + '%';
+    }
+
+    function removeOverlay() {
+      var ov = document.getElementById('oppAutoLoadOverlay');
+      if(ov) ov.remove();
+    }
+
+    // Set deal type globally and pre-fill the Opp ID
+    dealType = dt;
+    setMsg('Setting deal type to ' + dealTypeLabel(dt) + '…', 20);
+
+    // Check if SFDC is connected — if not, open the modal as fallback
+    var tok = sfdcLoadToken ? sfdcLoadToken() : null;
+    if(!tok || !tok.access_token) {
+      removeOverlay();
+      // Fallback: open the modal with Opp ID pre-filled
+      openDealTypeModal();
+      setTimeout(function() {
+        var oppEl = el('f_sfdcOppId');
+        if(oppEl) { oppEl.value = oppId; validateSfdcOpp(); }
+        selectDealType(dt);
+      }, 120);
+      return;
+    }
+
+    // For Upsell/Renewal, we need the rep to pick the parent contract
+    // so show the modal pre-filled rather than trying to auto-start
+    if(dt === 'UP' || dt === 'RN') {
+      removeOverlay();
+      openDealTypeModal();
+      setTimeout(function() {
+        var oppEl = el('f_sfdcOppId');
+        if(oppEl) { oppEl.value = oppId; validateSfdcOpp(); }
+        selectDealType(dt);
+        // Show a hint explaining why we're showing the modal
+        var hint = el('sfdcOppHint');
+        if(hint) hint.innerHTML = '<span style="color:#E89B00">&#9888; Select the parent contract below to continue with this '+dealTypeLabel(dt)+'.</span>';
+      }, 120);
+      return;
+    }
+
+    // Fetch Opp details from SFDC then auto-launch
+    setMsg('Fetching Opportunity details…', 40);
+    sfdcFetchOppDetails(oppId).then(function(details) {
+      setMsg('Preparing quote…', 70);
+
+      // Store prefill so startDeal() picks it up
+      if(details) window._sfdcOppPrefill = details;
+
+      // Pre-set the Opp ID on a hidden field the modal uses
+      // We bypass the modal entirely — directly call startDeal logic
+      var hiddenOpp = el('f_sfdcOppId');
+      if(!hiddenOpp) {
+        // Create a temporary hidden input if modal isn't open
+        hiddenOpp = document.createElement('input');
+        hiddenOpp.id = 'f_sfdcOppId';
+        hiddenOpp.type = 'hidden';
+        hiddenOpp.value = oppId;
+        document.body.appendChild(hiddenOpp);
+      } else {
+        hiddenOpp.value = oppId;
       }
-      var dt = ['NB','UP','RN'].includes(dealTypeParam) ? dealTypeParam : 'NB';
-      selectDealType(dt);
-    }, 120);
+
+      // Set deal type and any contract ref to null (NB needs none)
+      dealType = dt;
+      nbRefDealId = null;
+
+      setMsg('Launching…', 90);
+
+      setTimeout(function() {
+        removeOverlay();
+        try {
+          startDeal(); // This reads f_sfdcOppId and _sfdcOppPrefill
+
+          // If SFDC details came back, also patch state directly
+          // (startDeal may have run before prefill was applied)
+          if(details) {
+            if(details.accountName && !state.legal)  state.legal   = details.accountName;
+            if(details.billing     && !state.billing) state.billing = details.billing;
+            if(details.contactName && !state.contact) state.contact = details.contactName;
+            if(details.contactEmail && !state.email)  state.email   = details.contactEmail;
+            // Rebuild quote name now that we have the company name
+            var v = state.quoteVersion || 1;
+            state.quoteName = (state.legal ? state.legal + ' — ' : '') + 'v' + v;
+          }
+
+          showView('cpq');
+          // Re-render step 1 so fields show the prefilled values
+          setTimeout(function(){ try{ renderCPQ(); }catch(e){} }, 100);
+        } catch(e) {
+          // Fallback to modal if startDeal fails (e.g. UP/RN needs contract ref)
+          openDealTypeModal();
+          setTimeout(function() {
+            var oppEl = el('f_sfdcOppId');
+            if(oppEl) { oppEl.value = oppId; validateSfdcOpp(); }
+            selectDealType(dt);
+          }, 120);
+        }
+      }, 300);
+    }).catch(function() {
+      removeOverlay();
+      // Network error — fall back to modal
+      openDealTypeModal();
+      setTimeout(function() {
+        var oppEl = el('f_sfdcOppId');
+        if(oppEl) { oppEl.value = oppId; validateSfdcOpp(); }
+        selectDealType(dt);
+      }, 120);
+    });
   } catch(e) { /* ignore */ }
 }
 

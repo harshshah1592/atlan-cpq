@@ -4563,7 +4563,7 @@ const SFDC_PRODUCT_MAP = {
     'Admin':   { pbeId:'01u5e000003mKmnAAE', name:'Admin User',    code:'U-A' },
     'Member':  { pbeId:'01u5e000003mKmsAAE', name:'Member User',   code:'U-M' },
     'Guest':   { pbeId:'01uDu000000jXhhIAE', name:'Guest User',    code:'U-G' },
-    'Insights':{ pbeId:'01uDu000000jXhgIAE', name:'Insights User', code:'U-I' },
+    'Insights':{ pbeId:'01uDu000000jXhgIAE', product2Id:'01tDu000000JIvnIAG', name:'Insights User', code:'U-I' },
   },
   connectors: {
     'default': { pbeId:'01uDu000000jXhmIAE', name:'Out-of-the-Box Connector', code:'C-OTB' },
@@ -4580,7 +4580,7 @@ const SFDC_PRODUCT_MAP = {
     'workflow':         { pbeId:'', name:'Workflow Scheduler',                code:'A-WF'   },
     'ai_gov':           { pbeId:'', name:'AI Governance',                     code:'A-AIG'  },
     'dpm':              { pbeId:'', name:'Data Products - Package',           code:'A-DPM'  },
-    'ins_pkg':          { pbeId:'', name:'Insights Package',                  code:'A-INS'  },
+    'ins_pkg':          { pbeId:'01uQj0000044SRdIAM', product2Id:'01tQj00000CoNk5IAF', name:'Insights Package', code:'A-INS' },
     'apc':              { pbeId:'', name:'Advanced Policy and Compliance',    code:'A-APC'  },
     'dqs':              { pbeId:'', name:'Data Quality Studio',               code:'A-DQS'  },
     'mcp':              { pbeId:'', name:'Model Context Protocol Server',     code:'A-MCP'  },
@@ -6750,8 +6750,8 @@ function renderFMProducts() {
       +'The PricebookEntry ID (<code style="font-size:11px">01u...</code>) is the direct link — it bypasses name matching entirely so product renames in SFDC won\'t break anything. '
       +'To find IDs: in SFDC Developer Console run <code style="font-size:11px">SELECT Id, Name, ProductCode FROM PricebookEntry WHERE IsActive=true</code>'
     +'</div>'
-    +'<div style="margin-top:10px;display:flex;gap:8px">'
-      +'<button onclick="fetchProductsFromSFDC()" style="padding:7px 14px;border-radius:6px;border:none;background:var(--color-text-info);color:#fff;font-size:12px;font-weight:600;cursor:pointer">&#8635; Fetch from SFDC</button>'
+    +'<div style="margin-top:10px;display:flex;gap:8px;align-items:center">'
+      +'<button onclick="fetchProductsFromSFDC()" style="padding:8px 16px;border-radius:6px;border:none;background:#1B5FC4;color:#fff;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px">&#8635; Fetch PricebookEntry IDs from SFDC</button>'
       +'<span id="fmProdFetchStatus" style="font-size:12px;color:var(--color-text-info);align-self:center"></span>'
     +'</div>'
   +'</div>';

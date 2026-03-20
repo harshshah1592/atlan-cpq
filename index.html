@@ -756,6 +756,7 @@ textarea{resize:vertical;min-height:60px}
       <button class="fm-tab" onclick="setFMTab('profiles',this)">Profile → Role</button>
       <button class="fm-tab" onclick="setFMTab('quote-fields',this)">Quote Fields</button>
       <button class="fm-tab" onclick="setFMTab('opp-fields',this)">Opportunity Fields</button>
+      <button class="fm-tab" onclick="setFMTab('products',this)">Products</button>
       <button class="fm-tab" onclick="setFMTab('n8n',this)">N8N / Webhooks</button>
     </div>
     <div style="padding:24px 28px" id="fmBody"></div>
@@ -4406,6 +4407,83 @@ function F(obj, key) {
   return (SFDC_FIELD_MAP[obj] && SFDC_FIELD_MAP[obj][key]) || key;
 }
 
+// ── SFDC Product Map ──────────────────────────────────────────────
+// Maps CPQ line item categories/tiers directly to SFDC PricebookEntry IDs.
+// This avoids name-based Product2 lookup which breaks when names differ.
+// PricebookEntryId is the unique key that links a product to the Standard Pricebook.
+// To update: run a SOQL query in SFDC: SELECT Id,Name,ProductCode FROM PricebookEntry WHERE IsActive=true
+// ─────────────────────────────────────────────────────────────────
+const SFDC_PRODUCT_MAP = {
+  // Platform tiers — keyed by platformTier value in state
+  platform: {
+    'Standard':         { pbeId:'01uQj000004eIGrIAM', name:'Atlan Platform - Standard',      code:'AP-S'  },
+    'Enterprise':       { pbeId:'01uDu000000qZDeIAM', name:'Atlan Platform - Enterprise',    code:'AP-E'  },
+    'Business Critical':{ pbeId:'01uQj000004eIITIA2', name:'Atlan Platform - BizCritical',   code:'AP-BC' },
+  },
+  // User types — keyed by user type string
+  users: {
+    'Admin':   { pbeId:'01u5e000003mKmnAAE', name:'Admin User',    code:'U-A' },
+    'Member':  { pbeId:'01u5e000003mKmsAAE', name:'Member User',   code:'U-M' },
+    'Insights':{ pbeId:'01uDu000000jXhgIAE', name:'Insights User', code:'U-I' },
+    'Guest':   { pbeId:'01uDu000000jXhhIAE', name:'Guest User',    code:'U-G' },
+  },
+  // Connectors — all map to Out-of-the-Box Connector, qty = number of connectors
+  connectors: {
+    'default': { pbeId:'01uDu000000jXhmIAE', name:'Out-of-the-Box Connector', code:'C-OTB' },
+  },
+  // Professional Services — keyed by service name
+  services: {
+    'Implementation & Advisory Services': { pbeId:'01uQj000001mKS5IAM', name:'Professional Services - Simplify',   code:'P-PSS' },
+    'Jumpstart':                          { pbeId:'01uQj000000LGPxIAO', name:'Jumpstart',                           code:'P-J'   },
+    'Jumpstart+':                         { pbeId:'01uQj000000LGRZIA4', name:'Jumpstart+',                         code:'P-J+'  },
+    'Professional Services - Accelerate': { pbeId:'01uQj000001TNBzIAO', name:'Professional Services - Accelerate', code:'P-PSA' },
+    'Professional Services - Custom':     { pbeId:'01uQj0000022fIrIAI', name:'Professional Services - Custom',     code:'P-PSC' },
+    'default':                            { pbeId:'01uQj0000022fIrIAI', name:'Professional Services - Custom',     code:'P-PSC' },
+  },
+  // Add-ons — keyed by add-on id or name
+  addons: {
+    'additional_assets': { pbeId:'01uQj000005nS8LIAU', name:'Additional Assets', code:'AOP-AA' },
+    // Add more add-ons here as needed — run SOQL to get their PricebookEntry IDs
+  },
+};
+
+// Resolve a PricebookEntry for a line item using the product map
+// Returns { pbeId, name, code } or null if no match found
+function resolvePricebookEntry(item) {
+  var cat = item.cat || '';
+  var name = item.name || '';
+
+  // Platform
+  if(cat === 'Platform') {
+    var tier = (state.platformTier || 'Enterprise').trim();
+    return SFDC_PRODUCT_MAP.platform[tier] || SFDC_PRODUCT_MAP.platform['Enterprise'] || null;
+  }
+  // Users
+  if(cat === 'Users') {
+    // Extract type from name: "Users — Admin (×5)" → "Admin"
+    var typeMatch = name.match(/Users\s*[—-]\s*(\w+)/);
+    var uType = typeMatch ? typeMatch[1] : 'Member';
+    return SFDC_PRODUCT_MAP.users[uType] || SFDC_PRODUCT_MAP.users['Member'] || null;
+  }
+  // Connectors
+  if(cat === 'Connectors') {
+    return SFDC_PRODUCT_MAP.connectors['default'] || null;
+  }
+  // Services
+  if(cat === 'Services') {
+    // Try exact match on service name first, then default
+    var svcKey = Object.keys(SFDC_PRODUCT_MAP.services).find(function(k) {
+      return k !== 'default' && name.indexOf(k) !== -1;
+    });
+    return SFDC_PRODUCT_MAP.services[svcKey || 'default'] || null;
+  }
+  // Add-ons — try by item id if available, otherwise skip (no default)
+  if(cat === 'Add-on' && item.addonId) {
+    return SFDC_PRODUCT_MAP.addons[item.addonId] || null;
+  }
+  return null;
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // SALESFORCE OAUTH2 INTEGRATION
 // ═══════════════════════════════════════════════════════════════════
@@ -4793,24 +4871,10 @@ async function sfdcCreateQuoteRecord(snap, oppId, totalNet, totalList, disc) {
 async function sfdcPushQuoteLineItems(quoteId, items) {
   if(!quoteId || !items.length) return;
 
-  // Product2 name → Id cache (fetched once per push)
-  let product2Map = {};
-  try {
-    const names = [...new Set(items.map(function(it){ return it.name.split(' —')[0].trim(); }))];
-    const nameList = names.map(function(n){ return '\''+n.replace(/'/g,"\\'")+'\'' ; }).join(',');
-    const pRes = await sfdcApiCall(
-      '/services/data/v59.0/query?q='+encodeURIComponent('SELECT Id, Name FROM Product2 WHERE Name IN ('+nameList+') AND IsActive=true'),
-      'GET'
-    );
-    if(pRes && pRes.records) {
-      pRes.records.forEach(function(p){ product2Map[p.Name] = p.Id; });
-    }
-  } catch(e) { /* silently continue without product mapping */ }
-
   // Delete existing QuoteLineItems for this Quote (clean replace)
   try {
     const existing = await sfdcApiCall(
-       encodeURIComponent('SELECT Id FROM QuoteLineItem WHERE QuoteId=\'' + quoteId + '\' LIMIT 200'), 'GET'
+      '/services/data/v59.0/query?q='+encodeURIComponent('SELECT Id FROM QuoteLineItem WHERE QuoteId=\''+quoteId+'\' LIMIT 200'), 'GET'
     );
     if(existing && existing.records && existing.records.length) {
       await Promise.all(existing.records.map(function(r){
@@ -4819,14 +4883,11 @@ async function sfdcPushQuoteLineItems(quoteId, items) {
     }
   } catch(e) { /* ignore delete errors */ }
 
-  // Insert new QuoteLineItems
   const results = { ok:0, failed:0, failedItems:[] };
   for(const item of items) {
-    const productKey = item.name.split(' —')[0].trim();
-    const product2Id = product2Map[productKey] || null;
-    const unitPrice  = item.net > 0 ? item.net : item.list;
-    const listPrice  = item.list > 0 ? item.list : unitPrice;
-    const disc       = listPrice > 0 ? parseFloat(((listPrice-unitPrice)/listPrice*100).toFixed(2)) : 0;
+    const unitPrice = item.net  > 0 ? item.net  : item.list;
+    const listPrice = item.list > 0 ? item.list : unitPrice;
+    const disc      = listPrice > 0 ? parseFloat(((listPrice-unitPrice)/listPrice*100).toFixed(2)) : 0;
 
     const linePayload = {
       QuoteId:     quoteId,
@@ -4837,17 +4898,30 @@ async function sfdcPushQuoteLineItems(quoteId, items) {
       Discount:    disc,
     };
 
-    // If Product2 found, add PricebookEntry linkage
-    if(product2Id) {
-      // Look up standard pricebook entry
+    // Step 1: Try product map (fast — no extra API call)
+    const pbe = resolvePricebookEntry(item);
+    if(pbe && pbe.pbeId) {
+      linePayload.PricebookEntryId = pbe.pbeId;
+    } else {
+      // Step 2: Fallback — query by name for custom SKUs and unmapped add-ons
       try {
-        const pbRes = await sfdcApiCall(
-           encodeURIComponent('SELECT Id FROM PricebookEntry WHERE Product2Id=\'' + product2Id + '\' AND Pricebook2.IsStandard=true AND IsActive=true LIMIT 1'), 'GET'
+        const productKey = item.name.split(' —')[0].split('(')[0].trim();
+        const pRes = await sfdcApiCall(
+          '/services/data/v59.0/query?q='+encodeURIComponent(
+            'SELECT Id FROM Product2 WHERE Name=\''+productKey.replace(/'/g,"\\'")+'\'  AND IsActive=true LIMIT 1'
+          ), 'GET'
         );
-        if(pbRes && pbRes.records && pbRes.records[0]) {
-          linePayload.PricebookEntryId = pbRes.records[0].Id;
+        if(pRes && pRes.records && pRes.records[0]) {
+          const pbRes = await sfdcApiCall(
+            '/services/data/v59.0/query?q='+encodeURIComponent(
+              'SELECT Id FROM PricebookEntry WHERE Product2Id=\''+pRes.records[0].Id+'\'  AND Pricebook2.IsStandard=true AND IsActive=true LIMIT 1'
+            ), 'GET'
+          );
+          if(pbRes && pbRes.records && pbRes.records[0]) {
+            linePayload.PricebookEntryId = pbRes.records[0].Id;
+          }
         }
-      } catch(e) { /* no pricebook entry — proceed without */ }
+      } catch(e) { /* write without PricebookEntryId — line item still creates */ }
     }
 
     try {
@@ -4865,17 +4939,6 @@ async function sfdcPushQuoteLineItems(quoteId, items) {
       sfdcLogError('QuoteLineItem insert error for "'+item.name+'": '+(e.message||e));
     }
   }
-
-  // RevOps failsafe banner — show in SFDC settings if any line items failed
-  if(results.failed > 0) {
-    const failMsg = 'QUOTE LINE ITEMS: '+results.ok+' written, '+results.failed+' failed ('
-      +results.failedItems.join(', ')+
-      '). RevOps: open Salesforce Settings in the tool to review the error log. You can manually add these line items to Quote '+quoteId+'.';
-    sfdcLogError(failMsg);
-    showToast(results.failed+' line item(s) failed — see SFDC error log','#E89B00');
-  }
-
-  return results;
 }
 
 async function sfdcPushQuote() {
@@ -6198,14 +6261,194 @@ function renderFieldMapping() {
 function renderFMTab() {
   var body = el('fmBody');
   if(!body) return;
-  if(fmActiveTab === 'roles')        body.innerHTML = renderFMRoles();
-  else if(fmActiveTab === 'profiles') body.innerHTML = renderFMProfiles();
+  if(fmActiveTab === 'roles')             body.innerHTML = renderFMRoles();
+  else if(fmActiveTab === 'profiles')     body.innerHTML = renderFMProfiles();
   else if(fmActiveTab === 'quote-fields') body.innerHTML = renderFMQuoteFields();
   else if(fmActiveTab === 'opp-fields')   body.innerHTML = renderFMOppFields();
+  else if(fmActiveTab === 'products')     body.innerHTML = renderFMProducts();
   else if(fmActiveTab === 'n8n')          body.innerHTML = renderFMN8N();
 }
 
-// ── Tab 1: Role Hierarchy ─────────────────────────────────────────
+// ── Tab: Products ─────────────────────────────────────────────────
+function renderFMProducts() {
+  var groups = [
+    {
+      key: 'platform', label: 'Platform Tiers',
+      hint: 'Keyed by platformTier value — Standard / Enterprise / Business Critical',
+      color: '#6B48FF',
+      entries: Object.keys(SFDC_PRODUCT_MAP.platform).map(function(k) {
+        return { key: k, entry: SFDC_PRODUCT_MAP.platform[k] };
+      })
+    },
+    {
+      key: 'users', label: 'User Seats',
+      hint: 'Keyed by user type — Admin / Member / Insights / Guest',
+      color: '#0369A1',
+      entries: Object.keys(SFDC_PRODUCT_MAP.users).map(function(k) {
+        return { key: k, entry: SFDC_PRODUCT_MAP.users[k] };
+      })
+    },
+    {
+      key: 'connectors', label: 'Connectors',
+      hint: 'All connectors map to a single product — quantity is on the line item',
+      color: '#B91C1C',
+      entries: Object.keys(SFDC_PRODUCT_MAP.connectors).map(function(k) {
+        return { key: k, entry: SFDC_PRODUCT_MAP.connectors[k] };
+      })
+    },
+    {
+      key: 'services', label: 'Professional Services',
+      hint: 'Keyed by service name — "default" is the fallback',
+      color: '#166534',
+      entries: Object.keys(SFDC_PRODUCT_MAP.services).map(function(k) {
+        return { key: k, entry: SFDC_PRODUCT_MAP.services[k] };
+      })
+    },
+    {
+      key: 'addons', label: 'Add-ons',
+      hint: 'Keyed by add-on ID from the tool pricing config',
+      color: '#B45309',
+      entries: Object.keys(SFDC_PRODUCT_MAP.addons).map(function(k) {
+        return { key: k, entry: SFDC_PRODUCT_MAP.addons[k] };
+      })
+    },
+  ];
+
+  function entryRows(groupKey, entries) {
+    if(!entries.length) return '<div style="font-size:12px;color:var(--muted);padding:8px 0">No entries. Add via the + button below.</div>';
+    return entries.map(function(e, i) {
+      return '<div class="fm-row">'
+        +'<div class="fm-label" style="min-width:160px"><code style="font-size:11px">'+escHtml(e.key)+'</code>'
+          +'<div class="fm-label-sub">lookup key</div></div>'
+        +'<div style="flex:1;display:flex;gap:6px;flex-wrap:wrap;align-items:center">'
+          +'<input class="fm-input" value="'+escHtml(e.entry.name||'')+'" placeholder="SFDC Product Name" '
+            +'title="Must match exactly the Product Name in Salesforce (Product2.Name)" '
+            +'onchange="SFDC_PRODUCT_MAP[\''+groupKey+'\'][\''+escHtml(e.key)+'\'].name=this.value" '
+            +'style="flex:2;min-width:180px"/>'
+          +'<input class="fm-input fm-code" value="'+escHtml(e.entry.pbeId||'')+'" placeholder="PricebookEntry ID (01u...)" '
+            +'title="PricebookEntry.Id from SFDC — query: SELECT Id,Name FROM PricebookEntry WHERE IsActive=true" '
+            +'onchange="SFDC_PRODUCT_MAP[\''+groupKey+'\'][\''+escHtml(e.key)+'\'].pbeId=this.value" '
+            +'style="flex:1;min-width:160px;font-size:11px"/>'
+          +'<input class="fm-input fm-code" value="'+escHtml(e.entry.code||'')+'" placeholder="Code" '
+            +'onchange="SFDC_PRODUCT_MAP[\''+groupKey+'\'][\''+escHtml(e.key)+'\'].code=this.value" '
+            +'style="width:80px;font-size:11px"/>'
+          +'<button onclick="deleteFMProduct(\''+groupKey+'\',\''+escHtml(e.key)+'\')" '
+            +'style="padding:4px 8px;border:1px solid var(--color-border-danger);color:var(--color-text-danger);background:transparent;border-radius:5px;cursor:pointer;font-size:11px">✕</button>'
+        +'</div>'
+      +'</div>';
+    }).join('');
+  }
+
+  var html = '<div class="fm-card" style="margin-bottom:14px;background:var(--color-background-info);border-color:var(--color-border-info)">'
+    +'<div class="fm-card-title" style="color:var(--color-text-info)">How product mapping works</div>'
+    +'<div style="font-size:12px;color:var(--color-text-info);line-height:1.7;margin-top:4px">'
+      +'When the tool pushes a quote to SFDC, each line item is matched to a <strong>PricebookEntry</strong> using the category + key. '
+      +'The PricebookEntry ID (<code style="font-size:11px">01u...</code>) is the direct link — it bypasses name matching entirely so product renames in SFDC won\'t break anything. '
+      +'To find IDs: in SFDC Developer Console run <code style="font-size:11px">SELECT Id, Name, ProductCode FROM PricebookEntry WHERE IsActive=true</code>'
+    +'</div>'
+    +'<div style="margin-top:10px;display:flex;gap:8px">'
+      +'<button onclick="fetchProductsFromSFDC()" style="padding:7px 14px;border-radius:6px;border:none;background:var(--color-text-info);color:#fff;font-size:12px;font-weight:600;cursor:pointer">&#8635; Fetch from SFDC</button>'
+      +'<span id="fmProdFetchStatus" style="font-size:12px;color:var(--color-text-info);align-self:center"></span>'
+    +'</div>'
+  +'</div>';
+
+  groups.forEach(function(g) {
+    html += '<div class="fm-card">'
+      +'<div class="fm-card-title"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:'+g.color+';margin-right:6px"></span>'
+        +g.label
+      +'</div>'
+      +'<div class="fm-card-sub">'+g.hint+'</div>'
+      +entryRows(g.key, g.entries)
+      +'<button onclick="addFMProduct(\''+g.key+'\')" '
+        +'style="margin-top:8px;padding:5px 10px;border:1px dashed var(--color-border-tertiary);border-radius:5px;background:transparent;color:var(--color-text-tertiary);cursor:pointer;font-size:11px">+ Add entry</button>'
+    +'</div>';
+  });
+
+  return html;
+}
+
+function deleteFMProduct(groupKey, entryKey) {
+  if(!confirm('Remove "'+entryKey+'" from '+groupKey+'?')) return;
+  delete SFDC_PRODUCT_MAP[groupKey][entryKey];
+  renderFMTab();
+}
+
+function addFMProduct(groupKey) {
+  var key = prompt('Enter the lookup key for this product (e.g. "Enterprise", "Admin", "custom_addon_id"):');
+  if(!key || !key.trim()) return;
+  key = key.trim();
+  if(SFDC_PRODUCT_MAP[groupKey][key]) { showToast('Key "'+key+'" already exists in '+groupKey,'#D63B3B'); return; }
+  SFDC_PRODUCT_MAP[groupKey][key] = { pbeId: '', name: '', code: '' };
+  renderFMTab();
+}
+
+// Fetch active PricebookEntries from SFDC and auto-match to the product map
+async function fetchProductsFromSFDC() {
+  var status = document.getElementById('fmProdFetchStatus');
+  var tok = sfdcLoadToken ? sfdcLoadToken() : null;
+  if(!tok || !tok.access_token) {
+    if(status) status.textContent = '✕ Not connected to SFDC — connect first';
+    return;
+  }
+  if(status) status.textContent = '⏳ Fetching…';
+  try {
+    var res = await sfdcApiCall(
+      '/services/data/v59.0/query?q=' +
+      encodeURIComponent('SELECT Id, Name, ProductCode, Product2.Name FROM PricebookEntry WHERE IsActive=true AND Pricebook2.IsStandard=true ORDER BY Name'),
+      'GET'
+    );
+    if(!res || !res.records) { if(status) status.textContent = '✕ No records returned'; return; }
+
+    var matched = 0;
+    // Try to auto-match by comparing PBE Name against existing product map names
+    res.records.forEach(function(pbe) {
+      var pbeNameLower = (pbe.Name || '').toLowerCase();
+      // Check all groups
+      ['platform','users','connectors','services','addons'].forEach(function(group) {
+        Object.keys(SFDC_PRODUCT_MAP[group]).forEach(function(key) {
+          var entry = SFDC_PRODUCT_MAP[group][key];
+          var entryNameLower = (entry.name || '').toLowerCase();
+          if(entryNameLower && pbeNameLower.includes(entryNameLower.substring(0,10))) {
+            if(entry.pbeId !== pbe.Id) {
+              entry.pbeId = pbe.Id;
+              matched++;
+            }
+          }
+        });
+      });
+    });
+
+    // Store raw results for the admin to review
+    window._sfdcPbeList = res.records;
+    if(status) status.innerHTML = '✓ Fetched '+res.records.length+' active entries. Auto-matched '+matched+'. '
+      +'<button onclick="showPBEList()" style="padding:2px 8px;border:1px solid var(--color-border-tertiary);border-radius:4px;background:transparent;font-size:11px;cursor:pointer">View all</button>';
+    renderFMTab();
+  } catch(e) {
+    if(status) status.textContent = '✕ Error: '+(e.message||e);
+  }
+}
+
+function showPBEList() {
+  var list = window._sfdcPbeList || [];
+  if(!list.length) { alert('No data — run Fetch first'); return; }
+  var rows = list.map(function(p){
+    return p.Id + ' | ' + (p.Name||'') + ' | ' + (p.ProductCode||'');
+  }).join('\n');
+  // Show in a modal-style overlay
+  var modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center';
+  modal.innerHTML = '<div style="background:var(--card);border-radius:10px;padding:20px;max-width:700px;width:90%;max-height:80vh;overflow:auto">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'
+      +'<strong style="font-size:13px">Active PricebookEntries from SFDC</strong>'
+      +'<button onclick="this.closest(\'div[style*=fixed]\').remove()" style="border:none;background:transparent;font-size:16px;cursor:pointer">✕</button>'
+    +'</div>'
+    +'<div style="font-size:10.5px;color:var(--muted);margin-bottom:8px">ID | Name | ProductCode — copy IDs into the PricebookEntry ID fields above</div>'
+    +'<pre style="font-family:monospace;font-size:11px;background:var(--bg);padding:10px;border-radius:6px;overflow-x:auto;white-space:pre">'+escHtml(rows)+'</pre>'
+    +'</div>';
+  document.body.appendChild(modal);
+}
+
+// ── Tab: Role Hierarchy ─────────────────────────────────────────
 function renderFMRoles() {
   // Build a live-editable tree from SFDC_ROLE_VISIBILITY + SFDC_ROLE_TEAM_SCOPE
   var allRoles = Object.keys(SFDC_ROLE_VISIBILITY);

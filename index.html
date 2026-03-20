@@ -4861,6 +4861,19 @@ async function sfdcFetchCurrentUser() {
       'Profile: ' + profileName + (roleName ? ' · Role: ' + roleName : '')
     );
     showToast('Signed in as ' + userRes.Name + ' (' + profileName + ')','#00B87A');
+
+    // Fetch Standard Pricebook ID — needed for QuoteLineItem inserts
+    try {
+      const pbRes = await sfdcApiCall(
+        '/services/data/v59.0/query?q=' +
+        encodeURIComponent("SELECT Id FROM Pricebook2 WHERE IsStandard=true AND IsActive=true LIMIT 1"),
+        'GET'
+      );
+      if(pbRes && pbRes.records && pbRes.records[0]) {
+        window.STANDARD_PRICEBOOK_ID = pbRes.records[0].Id;
+      }
+    } catch(e) { /* silent — will fall back on quote push */ }
+
   } catch(e) {
     // Silent fail — role stays as current value
     sfdcLogError('sfdcFetchCurrentUser failed: ' + (e.message||e));
@@ -5086,10 +5099,24 @@ async function sfdcTestConnection() {
 // company/contact/billing, ARR, discount, line items, deal details.
 async function sfdcWriteDraftStepOne() {
   const tok = sfdcLoadToken ? sfdcLoadToken() : null;
-  if(!tok || !tok.access_token) return; // not connected — silent skip
+  if(!tok || !tok.access_token) return;
 
   const oppId = state.sfdcOppId;
   if(!oppId) return;
+
+  // Ensure Standard Pricebook ID is fetched before creating Quote
+  if(!window.STANDARD_PRICEBOOK_ID) {
+    try {
+      const pbRes = await sfdcApiCall(
+        '/services/data/v59.0/query?q=' +
+        encodeURIComponent('SELECT Id FROM Pricebook2 WHERE IsStandard=true AND IsActive=true LIMIT 1'),
+        'GET'
+      );
+      if(pbRes && pbRes.records && pbRes.records[0]) {
+        window.STANDARD_PRICEBOOK_ID = pbRes.records[0].Id;
+      }
+    } catch(e) { /* silent */ }
+  }
 
   const snap = saveDeal();
   const {totalList, totalNet, disc, items} = getTotals();
@@ -5102,6 +5129,7 @@ async function sfdcWriteDraftStepOne() {
     Status:         'Draft',
     Description:    snap.notes || '',
     ExpirationDate: snap.endDate || undefined,
+    Pricebook2Id:   window.STANDARD_PRICEBOOK_ID || undefined,
     // Note: standard Quote.Discount is read-only in SFDC — we store discount in Discount_Tier__c instead
   };
 
@@ -5199,14 +5227,28 @@ async function sfdcWriteDraftStepOne() {
 
 async function sfdcCreateQuoteRecord(snap, oppId, totalNet, totalList, disc) {
   const tier = getTier(disc);
-  // All governance fields live on Quote — use standard fields where they exist
+
+  // Ensure Standard Pricebook ID is resolved before building Quote payload
+  if(!window.STANDARD_PRICEBOOK_ID) {
+    try {
+      const pbRes = await sfdcApiCall(
+        '/services/data/v59.0/query?q=' +
+        encodeURIComponent('SELECT Id FROM Pricebook2 WHERE IsStandard=true AND IsActive=true LIMIT 1'),
+        'GET'
+      );
+      if(pbRes && pbRes.records && pbRes.records[0]) {
+        window.STANDARD_PRICEBOOK_ID = pbRes.records[0].Id;
+      }
+    } catch(e) { /* silent */ }
+  }
+
   const quotePayload = {
     OpportunityId:   oppId,
     Name:            snap.quoteName || (snap.legal+' — v'+(snap.quoteVersion||1)),
     ExpirationDate:  snap.endDate || null,
-    // Standard Quote fields (exist in Travis's org — confirmed from screenshot):
-    Status:          'Draft',  // Always starts as Draft — status updates via sfdcWriteStatusChange()
-    Description:     snap.notes || '',   // maps to discountNotes
+    Status:          'Draft',
+    Description:     snap.notes || '',
+    Pricebook2Id:    window.STANDARD_PRICEBOOK_ID || undefined,
     // Note: standard Quote.Discount is read-only in SFDC — use Discount_Tier__c instead
   };
   // Custom Quote fields (need creating — see SFDC_FIELD_MAP.quote):

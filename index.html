@@ -848,6 +848,10 @@ textarea{resize:vertical;min-height:60px}
             <label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Consumer Key</label>
             <input id="sfdc_client_id" type="text" placeholder="3MVG9..." style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px"/>
           </div>
+          <div>
+            <label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Consumer Secret</label>
+            <input id="sfdc_client_secret" type="password" placeholder="••••••••" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px"/>
+          </div>
           <div style="grid-column:span 2">
             <div style="font-size:11px;color:var(--muted);padding:8px 10px;background:var(--bg2);border-radius:6px;border:1px solid var(--border)">
               🔒 A Salesforce login popup will open when you click Connect. Sign in with your usual Atlan credentials — no password token needed. Username is auto-detected after login.
@@ -4521,7 +4525,7 @@ function sfdcPopulateCreds() {
   const set = (id, val) => { const el2 = document.getElementById(id); if(el2 && val) el2.value = val; };
   set('sfdc_instance_url', c.instanceUrl);
   set('sfdc_client_id',    c.clientId);
-  // username shown as read-only after login — don't restore password/secret (not stored)
+  set('sfdc_client_secret',c.clientSecret);
   const tok = sfdcLoadToken();
   if(tok && tok.access_token) {
     sfdcUpdateStatusUI(true, 'Connected', 'Instance: ' + (c.instanceUrl||'').replace('https://',''));
@@ -4689,13 +4693,14 @@ async function sfdcFetchCurrentUser() {
 }
 
 async function sfdcConnect() {
-  const instanceUrl = (document.getElementById('sfdc_instance_url')?.value||'').trim().replace(/\/$/,'');
-  const clientId    = (document.getElementById('sfdc_client_id')?.value||'').trim();
+  const instanceUrl  = (document.getElementById('sfdc_instance_url')?.value||'').trim().replace(/\/$/,'');
+  const clientId     = (document.getElementById('sfdc_client_id')?.value||'').trim();
+  const clientSecret = (document.getElementById('sfdc_client_secret')?.value||'').trim();
   if(!instanceUrl || !clientId) {
     showToast('Instance URL and Consumer Key are required','#D63B3B'); return;
   }
   sfdcUpdateStatusUI(false,'Opening Salesforce login…','A browser popup will appear — allow popups for this site');
-  const creds = {instanceUrl, clientId, clientSecret:'', username:'', password:''};
+  const creds = {instanceUrl, clientId, clientSecret, username:'', password:''};
   sfdcSaveCreds(creds);
   const ok = await sfdcFetchToken(creds);
   if(ok) {
@@ -4734,6 +4739,7 @@ function sfdcOAuthPopup(instanceUrl, clientId) {
       sessionStorage.setItem('sfdc_st', state);
       sessionStorage.setItem('sfdc_inst', instanceUrl);
       sessionStorage.setItem('sfdc_cid', clientId);
+      sessionStorage.setItem('sfdc_cs', sfdcLoadCreds()?.clientSecret || '');
 
       var authUrl = instanceUrl + '/services/oauth2/authorize'
         + '?response_type=code'
@@ -4758,19 +4764,23 @@ function sfdcOAuthPopup(instanceUrl, clientId) {
         if(event.data.state !== state) { reject(new Error('State mismatch — possible CSRF')); return; }
         var code = event.data.code;
         var cv = sessionStorage.getItem('sfdc_cv');
+        var cs = sessionStorage.getItem('sfdc_cs') || '';
         sessionStorage.removeItem('sfdc_cv'); sessionStorage.removeItem('sfdc_st');
         sessionStorage.removeItem('sfdc_inst'); sessionStorage.removeItem('sfdc_cid');
-        // Exchange code for token
+        sessionStorage.removeItem('sfdc_cs');
+        // Exchange code for token — include client_secret for External Client Apps
+        var tokenBody = {
+          grant_type:    'authorization_code',
+          client_id:     clientId,
+          redirect_uri:  redirectUri,
+          code:          code,
+          code_verifier: cv,
+        };
+        if(cs) tokenBody.client_secret = cs;
         fetch(instanceUrl + '/services/oauth2/token', {
           method: 'POST',
           headers: {'Content-Type':'application/x-www-form-urlencoded'},
-          body: new URLSearchParams({
-            grant_type: 'authorization_code',
-            client_id: clientId,
-            redirect_uri: redirectUri,
-            code: code,
-            code_verifier: cv,
-          }).toString()
+          body: new URLSearchParams(tokenBody).toString()
         })
         .then(function(r){ return r.json(); })
         .then(function(tok) {
@@ -6417,6 +6427,7 @@ function sfdcAuthGate() {
 function sfdcAuthGateConnect() {
   var inst = (document.getElementById('gate_instance_url')?.value||'').trim().replace(/\/$/,'');
   var cid  = (document.getElementById('gate_client_id')?.value||'').trim();
+  var csec = (document.getElementById('gate_client_secret')?.value||'').trim();
   var btn  = document.getElementById('gate_btn');
   var err  = document.getElementById('gate_error');
   if(!inst || !cid) {
@@ -6425,7 +6436,7 @@ function sfdcAuthGateConnect() {
   }
   btn.textContent = '⏳ Opening Salesforce login…'; btn.disabled = true;
   err.style.display = 'none';
-  var creds = {instanceUrl:inst, clientId:cid, clientSecret:'', username:'', password:''};
+  var creds = {instanceUrl:inst, clientId:cid, clientSecret:csec, username:'', password:''};
   sfdcSaveCreds(creds);
   sfdcFetchToken(creds).then(function(ok) {
     if(ok) {
@@ -7844,6 +7855,10 @@ buildPane8 = function() {
         <div>
           <label style="display:block;font-size:10px;font-weight:600;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px;">Consumer Key <span style="font-weight:400;color:rgba(255,255,255,.2);font-size:9px;">(from Connected App)</span></label>
           <input id="gate_client_id" type="text" value="3MVG9j6uMOMC1DNhAOBnxmwItaaraRGT566m02D0_F_8vFm7GhXAZw2aB4e.BHkGxYSA_wc4OPIFe7KO1CvNy" placeholder="3MVG9..." style="width:100%;padding:9px 12px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#fff;font-size:11px;font-family:monospace;outline:none;box-sizing:border-box;" onfocus="this.style.borderColor='rgba(59,130,246,.5)'" onblur="this.style.borderColor='rgba(255,255,255,.1)'"/>
+        </div>
+        <div>
+          <label style="display:block;font-size:10px;font-weight:600;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px;">Consumer Secret</label>
+          <input id="gate_client_secret" type="password" placeholder="••••••••••••" style="width:100%;padding:9px 12px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#fff;font-size:12px;outline:none;box-sizing:border-box;" onfocus="this.style.borderColor='rgba(59,130,246,.5)'" onblur="this.style.borderColor='rgba(255,255,255,.1)'"/>
         </div>
         <div style="padding:10px 12px;background:rgba(20,184,166,.08);border:1px solid rgba(20,184,166,.2);border-radius:7px;font-size:11.5px;color:rgba(255,255,255,.6);line-height:1.6">
           &#128274; A Salesforce login window will open. Sign in with your usual Atlan credentials — no password token needed.

@@ -845,25 +845,21 @@ textarea{resize:vertical;min-height:60px}
             <input id="sfdc_instance_url" type="text" placeholder="https://yourorg.my.salesforce.com" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px"/>
           </div>
           <div>
-            <label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Username <span style="font-weight:400;color:var(--faint)">(auto-detected on login)</span></label>
-            <input id="sfdc_username" type="text" placeholder="auto-detected from SFDC login" disabled style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg2);color:var(--faint)"/>
-          </div>
-          <div>
             <label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Consumer Key</label>
             <input id="sfdc_client_id" type="text" placeholder="3MVG9..." style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px"/>
           </div>
-          <div>
-            <label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Consumer Secret</label>
-            <input id="sfdc_client_secret" type="password" placeholder="••••••••" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px"/>
-          </div>
           <div style="grid-column:span 2">
             <div style="font-size:11px;color:var(--muted);padding:8px 10px;background:var(--bg2);border-radius:6px;border:1px solid var(--border)">
-              A Salesforce login window will open when you click Connect. Sign in with your usual credentials — no security token needed.
+              🔒 A Salesforce login popup will open when you click Connect. Sign in with your usual Atlan credentials — no password token needed. Username is auto-detected after login.
             </div>
+          </div>
+          <div style="grid-column:span 2">
+            <label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Logged in as <span style="font-weight:400;color:var(--faint)">(auto-detected)</span></label>
+            <input id="sfdc_username" type="text" placeholder="— connect to detect —" disabled style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg2);color:var(--faint)"/>
           </div>
         </div>
         <div style="display:flex;gap:8px">
-          <button onclick="sfdcConnect()" style="padding:8px 20px;border-radius:6px;border:none;background:#1B5FC4;color:#fff;font-size:13px;font-weight:600;cursor:pointer">Connect to Salesforce</button>
+          <button onclick="sfdcConnect()" style="padding:8px 20px;border-radius:6px;border:none;background:#1B5FC4;color:#fff;font-size:13px;font-weight:600;cursor:pointer">🔗 Connect to Salesforce</button>
           <button onclick="sfdcDisconnect()" style="padding:8px 16px;border-radius:6px;border:1px solid var(--border);background:transparent;font-size:12px;cursor:pointer;color:var(--muted)">Disconnect</button>
         </div>
       </div>
@@ -4524,10 +4520,8 @@ function sfdcPopulateCreds() {
   if(!c) return;
   const set = (id, val) => { const el2 = document.getElementById(id); if(el2 && val) el2.value = val; };
   set('sfdc_instance_url', c.instanceUrl);
-  set('sfdc_username',     c.username);
   set('sfdc_client_id',    c.clientId);
-  set('sfdc_client_secret',c.clientSecret);
-  set('sfdc_password',     c.password);
+  // username shown as read-only after login — don't restore password/secret (not stored)
   const tok = sfdcLoadToken();
   if(tok && tok.access_token) {
     sfdcUpdateStatusUI(true, 'Connected', 'Instance: ' + (c.instanceUrl||'').replace('https://',''));
@@ -4695,14 +4689,13 @@ async function sfdcFetchCurrentUser() {
 }
 
 async function sfdcConnect() {
-  const instanceUrl  = (document.getElementById('sfdc_instance_url')?.value||'').trim().replace(/\/$/,'');
-  const clientId     = (document.getElementById('sfdc_client_id')?.value||'').trim();
-  const clientSecret = (document.getElementById('sfdc_client_secret')?.value||'').trim();
-  if(!instanceUrl||!clientId) {
+  const instanceUrl = (document.getElementById('sfdc_instance_url')?.value||'').trim().replace(/\/$/,'');
+  const clientId    = (document.getElementById('sfdc_client_id')?.value||'').trim();
+  if(!instanceUrl || !clientId) {
     showToast('Instance URL and Consumer Key are required','#D63B3B'); return;
   }
-  sfdcUpdateStatusUI(false,'Opening Salesforce login…','A browser popup will appear');
-  const creds = {instanceUrl, clientId, clientSecret, username:'', password:''};
+  sfdcUpdateStatusUI(false,'Opening Salesforce login…','A browser popup will appear — allow popups for this site');
+  const creds = {instanceUrl, clientId, clientSecret:'', username:'', password:''};
   sfdcSaveCreds(creds);
   const ok = await sfdcFetchToken(creds);
   if(ok) {
@@ -4720,7 +4713,9 @@ async function sfdcConnect() {
 // Opens a Salesforce login popup → user logs in → token returned via postMessage.
 function sfdcOAuthPopup(instanceUrl, clientId) {
   return new Promise(function(resolve, reject) {
-    var redirectUri = window.location.origin + window.location.pathname;
+    // Always use the exact Callback URL registered in the Connected App
+    // Must match character-for-character — no trailing slash
+    var redirectUri = 'https://harshshah1592.github.io/atlan-cpq';
     var authUrl = instanceUrl + '/services/oauth2/authorize'
       + '?response_type=token'
       + '&client_id=' + encodeURIComponent(clientId)
@@ -6374,16 +6369,17 @@ function sfdcAuthGate() {
 }
 
 function sfdcAuthGateConnect() {
-  var inst   = (document.getElementById('gate_instance_url')?.value||'').trim().replace(/\/$/,'');
-  var cid    = (document.getElementById('gate_client_id')?.value||'').trim();
-  var csec   = (document.getElementById('gate_client_secret')?.value||'').trim();
-  var btn    = document.getElementById('gate_btn');
-  var err    = document.getElementById('gate_error');
-  if(!inst||!cid) {
-    err.textContent = 'Instance URL and Consumer Key are required.'; err.style.display='block'; return;
+  var inst = (document.getElementById('gate_instance_url')?.value||'').trim().replace(/\/$/,'');
+  var cid  = (document.getElementById('gate_client_id')?.value||'').trim();
+  var btn  = document.getElementById('gate_btn');
+  var err  = document.getElementById('gate_error');
+  if(!inst || !cid) {
+    err.textContent = 'Instance URL and Consumer Key are required.';
+    err.style.display = 'block'; return;
   }
-  btn.textContent = 'Opening Salesforce login…'; btn.disabled = true; err.style.display='none';
-  var creds = {instanceUrl:inst, clientId:cid, clientSecret:csec, username:'', password:''};
+  btn.textContent = '⏳ Opening Salesforce login…'; btn.disabled = true;
+  err.style.display = 'none';
+  var creds = {instanceUrl:inst, clientId:cid, clientSecret:'', username:'', password:''};
   sfdcSaveCreds(creds);
   sfdcFetchToken(creds).then(function(ok) {
     if(ok) {
@@ -6391,11 +6387,11 @@ function sfdcAuthGateConnect() {
       var appShell = document.querySelector('.shell');
       if(appShell) appShell.style.display = '';
       sfdcFetchCurrentUser().catch(function(){});
-      init();
+      try{ init(); }catch(e){}
     } else {
-      err.textContent = 'Login failed or popup was closed. Please try again.';
+      err.textContent = 'Login failed or popup was closed. Make sure popups are allowed for this site and try again.';
       err.style.display = 'block';
-      btn.textContent = 'Connect to Salesforce';
+      btn.textContent = '🔗 Connect to Salesforce';
       btn.disabled = false;
     }
   });
@@ -7783,39 +7779,26 @@ buildPane8 = function() {
 </script>
 <!-- ── SFDC Auth Gate — full screen login wall ── -->
 <div id="sfdcAuthGate" style="display:none;position:fixed;inset:0;z-index:9999;background:#0B1829;align-items:center;justify-content:center;flex-direction:column;">
-  <div style="width:100%;max-width:400px;padding:24px;">
-    <!-- Logo -->
+  <div style="width:100%;max-width:420px;padding:24px;">
     <div style="text-align:center;margin-bottom:32px;">
       <div style="font-size:22px;font-weight:700;color:#fff;letter-spacing:-.5px;margin-bottom:4px;">atlan <span style="color:#14b8a6">CPQ</span></div>
-      <div style="font-size:11px;color:rgba(255,255,255,.35);letter-spacing:.1em;text-transform:uppercase;">Connect your Salesforce account to continue</div>
+      <div style="font-size:11px;color:rgba(255,255,255,.35);letter-spacing:.1em;text-transform:uppercase;">Sign in with Salesforce to continue</div>
     </div>
-    <!-- Card -->
     <div style="background:#111827;border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:28px;">
-      <div style="font-size:13px;font-weight:600;color:#fff;margin-bottom:18px;">Salesforce Login</div>
       <div id="gate_error" style="display:none;background:rgba(196,38,27,.15);border:1px solid rgba(196,38,27,.3);border-radius:6px;padding:9px 12px;font-size:11.5px;color:#F87171;margin-bottom:14px;"></div>
-      <div style="display:flex;flex-direction:column;gap:10px;">
+      <div style="display:flex;flex-direction:column;gap:12px;">
         <div>
-          <label style="display:block;font-size:10px;font-weight:600;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px;">Instance URL</label>
-          <input id="gate_instance_url" type="text" placeholder="https://atlan.my.salesforce.com" style="width:100%;padding:9px 12px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#fff;font-size:12px;outline:none;" onfocus="this.style.borderColor='rgba(59,130,246,.5)'" onblur="this.style.borderColor='rgba(255,255,255,.1)'" onkeydown="if(event.key==='Enter')sfdcAuthGateConnect()"/>
+          <label style="display:block;font-size:10px;font-weight:600;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px;">Salesforce Instance URL</label>
+          <input id="gate_instance_url" type="text" value="https://atlanhq--harshtest.sandbox.my.salesforce.com" placeholder="https://atlan.my.salesforce.com" style="width:100%;padding:9px 12px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#fff;font-size:12px;outline:none;box-sizing:border-box;" onfocus="this.style.borderColor='rgba(59,130,246,.5)'" onblur="this.style.borderColor='rgba(255,255,255,.1)'"/>
         </div>
         <div>
-          <label style="display:block;font-size:10px;font-weight:600;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px;">Salesforce Username</label>
-          <input id="gate_username" type="email" placeholder="you@atlan.com" style="width:100%;padding:9px 12px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#fff;font-size:12px;outline:none;" onfocus="this.style.borderColor='rgba(59,130,246,.5)'" onblur="this.style.borderColor='rgba(255,255,255,.1)'" onkeydown="if(event.key==='Enter')sfdcAuthGateConnect()"/>
+          <label style="display:block;font-size:10px;font-weight:600;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px;">Consumer Key <span style="font-weight:400;color:rgba(255,255,255,.2);font-size:9px;">(from Connected App)</span></label>
+          <input id="gate_client_id" type="text" value="3MVG9j6uMOMC1DNhAOBnxmwItaaraRGT566m02D0_F_8vFm7GhXAZw2aB4e.BHkGxYSA_wc4OPIFe7KO1CvNy" placeholder="3MVG9..." style="width:100%;padding:9px 12px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#fff;font-size:11px;font-family:monospace;outline:none;box-sizing:border-box;" onfocus="this.style.borderColor='rgba(59,130,246,.5)'" onblur="this.style.borderColor='rgba(255,255,255,.1)'"/>
         </div>
-        <div>
-          <label style="display:block;font-size:10px;font-weight:600;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px;">Client ID <span style="font-weight:400;color:rgba(255,255,255,.2);font-size:9px;">(from Connected App)</span></label>
-          <input id="gate_client_id" type="text" placeholder="3MVG9..." style="width:100%;padding:9px 12px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#fff;font-size:12px;font-family:monospace;outline:none;" onfocus="this.style.borderColor='rgba(59,130,246,.5)'" onblur="this.style.borderColor='rgba(255,255,255,.1)'" onkeydown="if(event.key==='Enter')sfdcAuthGateConnect()"/>
+        <div style="padding:10px 12px;background:rgba(20,184,166,.08);border:1px solid rgba(20,184,166,.2);border-radius:7px;font-size:11.5px;color:rgba(255,255,255,.6);line-height:1.6">
+          &#128274; A Salesforce login window will open. Sign in with your usual Atlan credentials — no password token needed.
         </div>
-        <div>
-          <label style="display:block;font-size:10px;font-weight:600;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px;">Client Secret</label>
-          <input id="gate_client_secret" type="password" placeholder="••••••••••••" style="width:100%;padding:9px 12px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#fff;font-size:12px;outline:none;" onfocus="this.style.borderColor='rgba(59,130,246,.5)'" onblur="this.style.borderColor='rgba(255,255,255,.1)'" onkeydown="if(event.key==='Enter')sfdcAuthGateConnect()"/>
-        </div>
-        <div>
-          <div style="font-size:11px;color:rgba(255,255,255,.5);padding:10px 12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:7px;line-height:1.6">
-            A Salesforce login window will open. Sign in with your usual Atlan credentials — no security token needed.
-          </div>
-        </div>
-        <button id="gate_btn" onclick="sfdcAuthGateConnect()" style="width:100%;padding:11px;background:#1B5FC4;border:none;border-radius:7px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;margin-top:4px;transition:background .15s;" onmouseover="this.style.background='#1450A8'" onmouseout="this.style.background='#1B5FC4'">Connect to Salesforce</button>
+        <button id="gate_btn" onclick="sfdcAuthGateConnect()" style="width:100%;padding:13px;background:#1B5FC4;border:none;border-radius:7px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;transition:background .15s;" onmouseover="this.style.background='#1450A8'" onmouseout="this.style.background='#1B5FC4'">&#128279; Connect to Salesforce</button>
       </div>
     </div>
     <div style="text-align:center;margin-top:16px;font-size:10px;color:rgba(255,255,255,.2);">Access restricted to active Salesforce users · Atlan RevOps</div>

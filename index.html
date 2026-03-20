@@ -686,7 +686,7 @@ textarea{resize:vertical;min-height:60px}
       </div>
       <div id="matrixVisualBands" style="display:flex;gap:0;border-radius:8px;overflow:hidden;margin-bottom:18px;border:1px solid var(--border)"></div>
       <table class="matrix-table" id="matrixTable">
-        <thead><tr><th>#</th><th>Level</th><th>Approver / Role</th><th>Discount Up To (%)</th><th>Color</th><th></th></tr></thead>
+        <thead><tr><th>#</th><th>Level</th><th>Approver / Display Name</th><th>Resolution</th><th>Fixed Person (name · email)</th><th>Discount Up To (%)</th><th>Color</th><th></th></tr></thead>
         <tbody id="matrixBody"></tbody>
       </table>
       <div style="margin-top:14px;padding:12px;background:#FFF8E1;border:1px solid #FFE082;border-radius:var(--rs);font-size:12px;color:#B45309">
@@ -1961,11 +1961,11 @@ applyPricingConfig(pricingConfig);
 
 // Default approval tiers — loaded from localStorage if edited
 const DEFAULT_APPROVAL_TIERS=[
-  {max:15, label:"Self-Approved",    color:"#00B87A",icon:"✓",approver:"Rep / AE",             range:"0–15%"},
-  {max:25, label:"RSD / Manager",    color:"#E89B00",icon:"◑",approver:"RSD / Manager (Andrew)",range:"16–25%"},
-  {max:33, label:"BAM / Sales Lead", color:"#D63B3B",icon:"▲",approver:"BAM / Sales Leadership",range:"26–33%"},
-  {max:50, label:"CRO Approval",     color:"#7B2FBE",icon:"★",approver:"Jim (CRO)",             range:"34–50%"},
-  {max:100,label:"CEO Approval",     color:"#0B1829",icon:"⚑",approver:"PK (CEO)",              range:">50%"},
+  {max:15,  label:"Self-Approved",    color:"#00B87A", icon:"✓", approver:"Rep / AE",           resolution:"self",         fixedEmail:"", fixedName:"",        range:"0–15%"},
+  {max:25,  label:"RSD / Manager",    color:"#E89B00", icon:"◑", approver:"Direct Manager",      resolution:"manager",      fixedEmail:"", fixedName:"",        range:"16–25%"},
+  {max:33,  label:"BAM / Sales Lead", color:"#D63B3B", icon:"▲", approver:"Skip-level Manager",  resolution:"skip_manager", fixedEmail:"", fixedName:"",        range:"26–33%"},
+  {max:50,  label:"CRO Approval",     color:"#7B2FBE", icon:"★", approver:"Jim (CRO)",           resolution:"fixed",        fixedEmail:"jim@atlan.com",  fixedName:"Jim",  range:"34–50%"},
+  {max:100, label:"CEO Approval",     color:"#0B1829", icon:"⚑", approver:"PK (CEO)",            resolution:"fixed",        fixedEmail:"pk@atlan.com",   fixedName:"PK",   range:">50%"},
 ];
 let APPROVAL_TIERS = loadMatrix();
 // Load saved services matrix if exists
@@ -2111,6 +2111,51 @@ function el(id){return document.getElementById(id);}
 function badge(text,color){return `<span class="badge" style="background:${color}22;color:${color};border:1px solid ${color}55">${text}</span>`;}
 function colorForDisc(d){if(d>50)return'#0B1829';if(d>33)return'#7B2FBE';if(d>25)return'#D63B3B';if(d>15)return'#E89B00';return'#00B87A';}
 function getTier(d){return APPROVAL_TIERS.find(t=>d<=t.max)||APPROVAL_TIERS[APPROVAL_TIERS.length-1];}
+
+// Resolve the actual approver for a tier based on resolution strategy + SESSION_USER manager chain
+// Returns {name, email, source} — source tells you how it was resolved
+function resolveApproverForTier(tier) {
+  var res = tier.resolution || 'fixed';
+
+  if(res === 'self') {
+    return { name: SESSION_USER.name || 'Rep', email: SESSION_USER.email || '', source: 'self' };
+  }
+
+  if(res === 'manager') {
+    // Tier 2 — rep's direct manager
+    if(SESSION_USER.managerName) {
+      return { name: SESSION_USER.managerName, email: SESSION_USER.managerEmail, source: 'sfdc_manager' };
+    }
+    // Fallback: fixed name from tier config
+    return { name: tier.fixedName || tier.approver, email: tier.fixedEmail || '', source: 'fallback' };
+  }
+
+  if(res === 'skip_manager') {
+    // Tier 3 — skip-level manager (rep's manager's manager)
+    // EMEA exception: Andrew is both Tier 2 and Tier 3 — skip this tier entirely
+    if(SESSION_USER.isEMEA) {
+      return { name: '', email: '', source: 'skipped_emea', skipped: true };
+    }
+    if(SESSION_USER.skipManagerName) {
+      return { name: SESSION_USER.skipManagerName, email: SESSION_USER.skipManagerEmail, source: 'sfdc_skip_manager' };
+    }
+    // Fallback: fixed name from tier config
+    return { name: tier.fixedName || tier.approver, email: tier.fixedEmail || '', source: 'fallback' };
+  }
+
+  // fixed — always the same person (CRO, CEO)
+  return { name: tier.fixedName || tier.approver, email: tier.fixedEmail || '', source: 'fixed' };
+}
+
+// Get the effective approver display name for a tier (used in UI labels)
+function getTierApproverLabel(tier) {
+  var resolved = resolveApproverForTier(tier);
+  if(resolved.skipped) return '— skipped (EMEA) —';
+  if(resolved.source === 'sfdc_manager' || resolved.source === 'sfdc_skip_manager') {
+    return resolved.name + ' (from SFDC)';
+  }
+  return resolved.name || tier.approver || tier.label;
+}
 function dealTypeLabel(dt){return dt==='UP'?'Upsell':dt==='RN'?'Renewal':'New Business';}
 function dealTypeColor(dt){return dt==='UP'?'#009DB5':dt==='RN'?'#6B4FA8':'#1B5FC4';}
 
@@ -3371,7 +3416,7 @@ function renderSummaryStep(){
   if(el('tierBanner')) el('tierBanner').innerHTML=`<div class="tier-banner" style="background:${tier.color}11;border:1.5px solid ${tier.color}44">
     <div style="width:38px;height:38px;border-radius:50%;background:${tier.color};display:grid;place-items:center;font-size:17px;color:#fff;flex-shrink:0">${tier.icon}</div>
     <div><div style="font-weight:700;font-size:13px;color:${tier.color}">${tier.label} Required</div>
-      <div style="font-size:11px;color:var(--muted)">${pct(disc)} blended discount — approver: <strong>${tier.approver}</strong></div></div>
+      <div style="font-size:11px;color:var(--muted)">${pct(disc)} blended discount — approver: <strong>${getTierApproverLabel(tier)}</strong></div></div>
     <div style="margin-left:auto;text-align:right"><div style="font-size:9px;color:var(--faint)">Threshold</div>
       <div style="font-size:12px;font-weight:700;color:${tier.color}">${tier.range}</div></div>
   </div>`;
@@ -3458,7 +3503,7 @@ function renderApprovalStep(){
   if(el('approvalBanner'))el('approvalBanner').innerHTML=reApprovalBannerHtml+dealDeskBannerHtml+competitorBannerHtml+amapBannerHtml+`<div class="tier-banner" style="background:${tier.color}11;border:1px solid ${tier.color}33;margin-bottom:14px">
     <div style="width:36px;height:36px;border-radius:50%;background:${tier.color};display:grid;place-items:center;font-size:16px;color:#fff;flex-shrink:0">${tier.icon}</div>
     <div><div style="font-weight:700;color:${tier.color}">${state.isAMAP?'AMAP Override: CRO Approval Required':tier.label+' — '+pct(disc)}</div>
-      <div style="font-size:11px;color:var(--muted)">Required: <strong>${state.isAMAP?'Jim (CRO)':tier.approver}</strong></div></div>
+      <div style="font-size:11px;color:var(--muted)">Required: <strong>${state.isAMAP?'Jim (CRO)':getTierApproverLabel(tier)}</strong></div></div>
     <div style="margin-left:auto;text-align:right;font-size:11px;color:var(--muted)">${state.isAMAP?'AMAP override active':'Only highest approver required'}</div>
   </div>`;
 
@@ -4514,28 +4559,41 @@ async function sfdcFetchCurrentUser() {
     const userId = info.user_id || info.sub;
     if(!userId) return;
 
-    // Step 2: Fetch User record with Profile.Name
+    // Step 2: Fetch User record with Profile, Role, and Manager chain
     const userRes = await sfdcApiCall(
       '/services/data/v59.0/sobjects/User/' + userId +
-      '?fields=Id,Name,Email,Profile.Name,UserRole.Name', 'GET'
+      '?fields=Id,Name,Email,Profile.Name,UserRole.Name,ManagerId,Manager.Name,Manager.Email,Manager.ManagerId,Manager.Manager.Name,Manager.Manager.Email', 'GET'
     );
     if(!userRes) return;
 
-    const profileName = (userRes.Profile && userRes.Profile.Name) || '';
-    const roleName    = (userRes.UserRole && userRes.UserRole.Name) || '';
-    const toolRole    = sfdcProfileToRole(profileName) || sfdcProfileToRole(roleName);
-    const visScope    = SFDC_ROLE_VISIBILITY[roleName] || 'own';
+    const profileName    = (userRes.Profile   && userRes.Profile.Name)   || '';
+    const roleName       = (userRes.UserRole  && userRes.UserRole.Name)  || '';
+    const toolRole       = sfdcProfileToRole(profileName) || sfdcProfileToRole(roleName);
+    const visScope       = SFDC_ROLE_VISIBILITY[roleName] || 'own';
 
-    // Update SESSION_USER with real SFDC identity
-    SESSION_USER.name            = userRes.Name || SESSION_USER.name;
-    SESSION_USER.firstName       = (userRes.Name||'').split(' ')[0] || SESSION_USER.firstName;
-    SESSION_USER.email           = userRes.Email || SESSION_USER.email;
-    SESSION_USER.role            = toolRole;
-    SESSION_USER.initials        = (userRes.Name||'').split(' ').map(function(w){ return w[0]; }).join('').slice(0,2).toUpperCase() || SESSION_USER.initials;
-    SESSION_USER.sfdcProfileName = profileName;
-    SESSION_USER.sfdcRoleName    = roleName;     // SFDC UserRole.Name — drives team scoping
-    SESSION_USER.sfdcVisScope    = visScope;     // 'all' | 'team' | 'own'
-    SESSION_USER.repName         = userRes.Name || SESSION_USER.repName;
+    // Manager chain — Tier 2 = direct manager, Tier 3 = skip-level
+    const mgr     = userRes.Manager || {};
+    const skipMgr = mgr.Manager    || {};
+
+    // Update SESSION_USER with real SFDC identity + manager chain
+    SESSION_USER.name              = userRes.Name  || SESSION_USER.name;
+    SESSION_USER.firstName         = (userRes.Name||'').split(' ')[0] || SESSION_USER.firstName;
+    SESSION_USER.email             = userRes.Email || SESSION_USER.email;
+    SESSION_USER.role              = toolRole;
+    SESSION_USER.initials          = (userRes.Name||'').split(' ').map(function(w){ return w[0]; }).join('').slice(0,2).toUpperCase() || SESSION_USER.initials;
+    SESSION_USER.sfdcProfileName   = profileName;
+    SESSION_USER.sfdcRoleName      = roleName;
+    SESSION_USER.sfdcVisScope      = visScope;
+    SESSION_USER.repName           = userRes.Name  || SESSION_USER.repName;
+    // Manager chain for dynamic approver resolution
+    SESSION_USER.managerId         = mgr.Id        || '';
+    SESSION_USER.managerName       = mgr.Name      || '';
+    SESSION_USER.managerEmail      = mgr.Email     || '';
+    SESSION_USER.skipManagerId     = skipMgr.Id    || '';
+    SESSION_USER.skipManagerName   = skipMgr.Name  || '';
+    SESSION_USER.skipManagerEmail  = skipMgr.Email || '';
+    // EMEA flag — Tier 3 is skipped for EMEA reps (RSD = VP equivalent)
+    SESSION_USER.isEMEA            = roleName.toUpperCase().includes('EMEA');
 
     // Show dev role switcher only for System Administrators
     var devPanel = el('devRoleSwitcher');
@@ -4693,7 +4751,10 @@ async function sfdcCreateQuoteRecord(snap, oppId, totalNet, totalList, disc) {
   if(snap.quoteStatus === 'In Review' || snap.quoteStatus === 'Pending Approval') {
     const{disc} = getTotals();
     const tier = getTier(disc);
-    quotePayload[F('quote','approverName')] = tier.approver || tier.label || '';
+    const tierForApprover = getTier(disc);
+    const resolvedForSFDC = resolveApproverForTier(tierForApprover);
+    quotePayload[F('quote','approverName')] = resolvedForSFDC.name || tierForApprover.approver || tierForApprover.label || '';
+    // approverEmail is stored in N8N payload only — not a separate SFDC field unless you add one
   }
   try {
     // Upsert by external ID field CPQ_Quote_ID__c
@@ -5074,7 +5135,7 @@ function renderDashboard(){
         <div class="aq-company">${d.legal||d.dealId} <span class="badge" style="background:${tier.color}22;color:${tier.color};border:1px solid ${tier.color}55;font-size:9px">Pending ${tier.label}</span></div>
         <div class="aq-detail">${d.repName||'Rep'} · ${fmt(d.totalList||0,cur)} list · ${pct(d.disc||0)} discount</div>
       </div>
-      <span class="badge" style="background:${tier.color}22;color:${tier.color};border:1px solid ${tier.color}55">● ${tier.approver}</span>
+      <span class="badge" style="background:${tier.color}22;color:${tier.color};border:1px solid ${tier.color}55">● ${getTierApproverLabel(tier)}</span>
     </div>`;
   }).join(''):'<div style="color:var(--faint);font-size:12px;padding:10px 0">No pending approvals.</div>';
 
@@ -5116,7 +5177,7 @@ function renderDashboard(){
       <td class="mono">${fmt(d.totalList||0,cur)}</td>
       <td class="mono" style="font-weight:700;color:var(--blue)">${fmt(d.totalNet||0,cur)}</td>
       <td>${badge(pct(d.disc||0),colorForDisc(d.disc||0))}</td>
-      <td><span class="badge" style="background:${tier.color}22;color:${tier.color};border:1px solid ${tier.color}44;font-size:9px">● ${tier.approver}</span></td>
+      <td><span class="badge" style="background:${tier.color}22;color:${tier.color};border:1px solid ${tier.color}44;font-size:9px">● ${getTierApproverLabel(tier)}</span></td>
       <td>${badge(d.status||'Draft',d.status==='Approved'?'#16A34A':d.status==='Pending Approval'?'#B45309':'#4A5568')}</td>
       <td style="font-size:11px;color:var(--faint)">${d.submittedAt?new Date(d.submittedAt).toLocaleDateString('en-US',{month:'short',day:'numeric'}):'Draft'}</td>
     </tr>`;
@@ -5149,23 +5210,46 @@ function renderApprovalMatrix(){
     </div>`;
   }).join('');
 
-  if(el('matrixBody')) el('matrixBody').innerHTML=APPROVAL_TIERS.map((t,i)=>`<tr>
-    <td style="color:var(--faint);font-size:11px">${i+1}</td>
-    <td><input class="matrix-name-input" value="${escHtml(t.label)}" onchange="updateMatrixRow(${i},'label',this.value);renderApprovalMatrix()"/></td>
-    <td><input class="matrix-name-input" value="${escHtml(t.approver)}" onchange="updateMatrixRow(${i},'approver',this.value)" style="width:220px"/></td>
-    <td><div style="display:flex;align-items:center;gap:5px">
-      <input class="matrix-editable" type="number" min="0" max="100" value="${t.max}" onchange="updateMatrixRow(${i},'max',this.value);renderApprovalMatrix()"/>
-      <span style="font-size:11px;color:var(--faint)">%</span>
-    </div></td>
-    <td><div style="display:flex;align-items:center;gap:7px">
-      <input type="color" value="${t.color}" onchange="updateMatrixRow(${i},'color',this.value);renderApprovalMatrix()" style="width:36px;height:28px;padding:2px;border:1px solid var(--border);border-radius:4px;cursor:pointer"/>
-      <span style="width:14px;height:14px;border-radius:3px;display:inline-block;background:${t.color}"></span>
-    </div></td>
-    <td>${APPROVAL_TIERS.length>1
-      ? `<button onclick="removeMatrixTier(${i})" style="padding:3px 9px;border-radius:var(--rs);font-size:11px;cursor:pointer;border:1px solid #FECACA;color:#D63B3B;background:#FEF2F2">✕</button>`
-      : '<span style="font-size:10px;color:var(--faint)">min 1</span>'
-    }</td>
-  </tr>`).join('');
+  if(el('matrixBody')) el('matrixBody').innerHTML=APPROVAL_TIERS.map(function(t,i){
+    var resolved = resolveApproverForTier(t);
+    var resolvedLabel = resolved.skipped ? '<span style="color:var(--muted);font-style:italic;font-size:11px">skipped — EMEA</span>'
+      : (resolved.source === 'sfdc_manager' || resolved.source === 'sfdc_skip_manager')
+        ? '<span style="color:#059669;font-size:11px">&#10003; '+escHtml(resolved.name)+'</span>'
+        : resolved.source === 'fallback'
+          ? '<span style="color:#E89B00;font-size:11px">&#9888; fallback: '+escHtml(resolved.name)+'</span>'
+          : '<span style="font-size:11px;color:var(--muted)">'+escHtml(resolved.name)+'</span>';
+    var isFixed = t.resolution === 'fixed';
+    var resoOpts = ['self','manager','skip_manager','fixed'].map(function(o){
+      var labels = {self:"Self-approve (rep)",manager:"Rep's direct manager",skip_manager:'Skip-level manager',fixed:'Fixed person'};
+      return '<option value="'+o+'"'+(t.resolution===o?' selected':'')+'>'+labels[o]+'</option>';
+    }).join('');
+    return '<tr>'
+      +'<td style="color:var(--faint);font-size:11px">'+(i+1)+'</td>'
+      +'<td>'
+        +'<input class="matrix-name-input" value="'+escHtml(t.label)+'" onchange="updateMatrixRow('+i+',\'label\',this.value);renderApprovalMatrix()"/>'
+        +'<div style="margin-top:4px;font-size:10.5px;color:var(--muted)">Resolved: '+resolvedLabel+'</div>'
+      +'</td>'
+      +'<td><select class="fm-scope-select" style="width:100%" onchange="updateMatrixRow('+i+',\'resolution\',this.value);saveMatrix();renderApprovalMatrix()">'+resoOpts+'</select></td>'
+      +'<td>'
+        +(isFixed
+          ? '<input class="matrix-name-input" value="'+escHtml(t.fixedName||'')+'" placeholder="Name" onchange="updateMatrixRow('+i+',\'fixedName\',this.value)" style="width:100px;margin-bottom:4px"/>'
+            +'<br/><input class="matrix-name-input" value="'+escHtml(t.fixedEmail||'')+'" placeholder="email@atlan.com" onchange="updateMatrixRow('+i+',\'fixedEmail\',this.value)" style="width:160px;font-size:11px"/>'
+          : '<span style="font-size:11px;color:var(--muted);font-style:italic">pulled from SFDC manager chain</span>')
+      +'</td>'
+      +'<td><div style="display:flex;align-items:center;gap:5px">'
+        +'<input class="matrix-editable" type="number" min="0" max="100" value="'+t.max+'" onchange="updateMatrixRow('+i+',\'max\',this.value);renderApprovalMatrix()"/>'
+        +'<span style="font-size:11px;color:var(--faint)">%</span>'
+      +'</div></td>'
+      +'<td><div style="display:flex;align-items:center;gap:7px">'
+        +'<input type="color" value="'+t.color+'" onchange="updateMatrixRow('+i+',\'color\',this.value);renderApprovalMatrix()" style="width:36px;height:28px;padding:2px;border:1px solid var(--border);border-radius:4px;cursor:pointer"/>'
+        +'<span style="width:14px;height:14px;border-radius:3px;display:inline-block;background:'+t.color+'"></span>'
+      +'</div></td>'
+      +'<td>'+(APPROVAL_TIERS.length>1
+        ? '<button onclick="removeMatrixTier('+i+')" style="padding:3px 9px;border-radius:var(--rs);font-size:11px;cursor:pointer;border:1px solid #FECACA;color:#D63B3B;background:#FEF2F2">&#10005;</button>'
+        : '<span style="font-size:10px;color:var(--faint)">min 1</span>')
+      +'</td>'
+    +'</tr>';
+  }).join('');
 
   if(el('svcMatrixBody')) el('svcMatrixBody').innerHTML=SERVICES.map((s,si)=>`
     <tr><td rowspan="2" style="font-weight:600;vertical-align:middle">${s.name}</td><td>1-year deal</td>
@@ -6735,6 +6819,7 @@ async function n8nNotifySubmit(snap, tier, submittedBy) {
     + '&sfdcQuoteId=' + encodeURIComponent(state.sfdcQuoteId||'')
     + '&token=' + encodeURIComponent(N8N_CONFIG.callbackSecret);
 
+  var resolvedApprover = resolveApproverForTier(tier);
   const payload = {
     event:          'quote_submitted',
     quoteId:        snap.dealId,
@@ -6743,7 +6828,10 @@ async function n8nNotifySubmit(snap, tier, submittedBy) {
     company:        snap.legal || snap.company || '',
     repName:        submittedBy,
     tierLabel:      tier.label,
-    approverName:   tier.approver || '',
+    approverName:   resolvedApprover.name  || tier.approver || '',
+    approverEmail:  resolvedApprover.email || '',
+    approverSource: resolvedApprover.source || '',
+    tierSkipped:    resolvedApprover.skipped || false,
     discountPct:    parseFloat(disc.toFixed(2)),
     listARR:        Math.round(totalList),
     netARR:         Math.round(totalNet),

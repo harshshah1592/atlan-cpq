@@ -4720,7 +4720,7 @@ function sfdcOAuthPopup(instanceUrl, clientId) {
       + '?response_type=token'
       + '&client_id=' + encodeURIComponent(clientId)
       + '&redirect_uri=' + encodeURIComponent(redirectUri)
-      + '&scope=' + encodeURIComponent('full refresh_token offline_access')
+      + '&scope=' + encodeURIComponent('api refresh_token offline_access')
       + '&prompt=login';
 
     var popup = window.open(authUrl, 'sfdcOAuth',

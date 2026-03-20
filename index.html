@@ -4692,6 +4692,28 @@ function sfdcProfileToRole(profileName) {
 
 // Fetch current SFDC user details and set SESSION_USER role automatically
 // Called after a successful sfdcConnect() or on page load if already connected
+
+// ── Toast notification utility ────────────────────────────────────
+function showToast(msg, color, duration) {
+  try {
+    var existing = document.getElementById('cpqToast');
+    if(existing) existing.remove();
+    var t = document.createElement('div');
+    t.id = 'cpqToast';
+    t.textContent = msg;
+    t.style.cssText = 'position:fixed;bottom:24px;right:24px;z-index:99999;'
+      + 'padding:10px 18px;border-radius:8px;font-size:13px;font-weight:600;'
+      + 'color:#fff;background:' + (color||'#1B5FC4') + ';'
+      + 'box-shadow:0 4px 16px rgba(0,0,0,.18);pointer-events:none;'
+      + 'transition:opacity .3s ease;opacity:1';
+    document.body.appendChild(t);
+    setTimeout(function(){
+      t.style.opacity='0';
+      setTimeout(function(){ if(t.parentNode) t.remove(); }, 300);
+    }, duration||3000);
+  } catch(e) {}
+}
+
 async function sfdcFetchCurrentUser() {
   const tok = sfdcLoadToken();
   if(!tok || !tok.access_token) return;
@@ -5100,7 +5122,7 @@ async function sfdcCreateQuoteRecord(snap, oppId, totalNet, totalList, disc) {
     // Standard Quote fields (exist in Travis's org — confirmed from screenshot):
     Status:          'Draft',  // Always starts as Draft — status updates via sfdcWriteStatusChange()
     Description:     snap.notes || '',   // maps to discountNotes
-    Discount:        parseFloat(disc.toFixed(2)),  // standard Discount (Percent 3,2)
+    // Note: standard Quote.Discount is read-only in SFDC — use Discount_Tier__c instead
   };
   // Custom Quote fields (need creating — see SFDC_FIELD_MAP.quote):
   quotePayload[F('quote','listPriceARR')]  = Math.round(totalList);

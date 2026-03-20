@@ -4499,13 +4499,15 @@ const SFDC_FIELD_MAP = {
   // ── QuoteLineItem fields (one record per line item) ─────────────
   // All standard fields — confirmed against Travis's screenshot.
   lineItem: {
-    quoteId:        'QuoteId',          // Master-Detail to Quote (Quote Name field)
-    description:    'Description',     // Line Item Description
-    quantity:       'Quantity',         // Number(10,2)
-    unitPrice:      'UnitPrice',        // Sales Price field
-    listPrice:      'ListPrice',        // List Price field
-    discount:       'Discount',         // Discount (Percentage)
-    pricebookEntry: 'PricebookEntryId', // Required if using Product2 lookup
+    quoteId:        'QuoteId',                          // Master-Detail to Quote
+    description:    'Description',                     // Line Item Description
+    quantity:       'Quantity',                         // Number(10,2)
+    unitPrice:      'UnitPrice',                        // Sales Price field
+    listPrice:      'ListPrice',                        // List Price field (read-only)
+    discount:       'Discount',                         // Discount (Percentage)
+    pricebookEntry: 'PricebookEntryId',                 // Required — links to Product
+    startDate:      'Start_Date__c',                    // Required custom field
+    termMonths:     'Subscription_Length_in_Months__c', // Required custom field
   },
 
   // ── Standard SFDC Approval Process objects (no custom object needed) ──────
@@ -5332,6 +5334,10 @@ async function sfdcPushQuoteLineItems(quoteId, items) {
     }
   } catch(e) { /* ignore delete errors */ }
 
+  // Get start date and term months from deal state — required by QuoteLineItem schema
+  const lineStartDate   = state.startDate || null;
+  const lineTermMonths  = parseInt(state.termMonths) || 12;
+
   const results = { ok:0, failed:0, failedItems:[] };
   for(const item of items) {
     const unitPrice = item.net  > 0 ? item.net  : item.list;
@@ -5339,12 +5345,14 @@ async function sfdcPushQuoteLineItems(quoteId, items) {
     const disc      = listPrice > 0 ? parseFloat(((listPrice-unitPrice)/listPrice*100).toFixed(2)) : 0;
 
     const linePayload = {
-      QuoteId:     quoteId,
-      Description: item.name,
-      Quantity:    item.qty || 1,
-      UnitPrice:   Math.round(unitPrice),
+      QuoteId:                       quoteId,
+      Description:                   item.name,
+      Quantity:                      item.qty || 1,
+      UnitPrice:                     Math.round(unitPrice),
       // ListPrice is read-only in SFDC (calculated from PricebookEntry) — don't write it
     };
+    if(lineStartDate)  linePayload[F('lineItem','startDate')]   = lineStartDate;
+    if(lineTermMonths) linePayload[F('lineItem','termMonths')]   = lineTermMonths;
     if(disc > 0 && disc < 100) linePayload.Discount = parseFloat(disc.toFixed(2));
 
     // Step 1: Try product map (fast — no extra API call)

@@ -845,8 +845,8 @@ textarea{resize:vertical;min-height:60px}
             <input id="sfdc_instance_url" type="text" placeholder="https://yourorg.my.salesforce.com" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px"/>
           </div>
           <div>
-            <label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Username</label>
-            <input id="sfdc_username" type="text" placeholder="user@atlan.com" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px"/>
+            <label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Username <span style="font-weight:400;color:var(--faint)">(auto-detected on login)</span></label>
+            <input id="sfdc_username" type="text" placeholder="auto-detected from SFDC login" disabled style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg2);color:var(--faint)"/>
           </div>
           <div>
             <label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Consumer Key</label>
@@ -857,8 +857,9 @@ textarea{resize:vertical;min-height:60px}
             <input id="sfdc_client_secret" type="password" placeholder="••••••••" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px"/>
           </div>
           <div style="grid-column:span 2">
-            <label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Password + Security Token <span style="font-weight:400;color:var(--faint)">(no space between them)</span></label>
-            <input id="sfdc_password" type="password" placeholder="MyPassword123AbCxYz..." style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px"/>
+            <div style="font-size:11px;color:var(--muted);padding:8px 10px;background:var(--bg2);border-radius:6px;border:1px solid var(--border)">
+              A Salesforce login window will open when you click Connect. Sign in with your usual credentials — no security token needed.
+            </div>
           </div>
         </div>
         <div style="display:flex;gap:8px">
@@ -4695,54 +4696,99 @@ async function sfdcFetchCurrentUser() {
 
 async function sfdcConnect() {
   const instanceUrl  = (document.getElementById('sfdc_instance_url')?.value||'').trim().replace(/\/$/,'');
-  const username     = (document.getElementById('sfdc_username')?.value||'').trim();
   const clientId     = (document.getElementById('sfdc_client_id')?.value||'').trim();
   const clientSecret = (document.getElementById('sfdc_client_secret')?.value||'').trim();
-  const password     = (document.getElementById('sfdc_password')?.value||'').trim();
-  if(!instanceUrl||!username||!clientId||!clientSecret||!password) {
-    showToast('All fields are required to connect','#D63B3B'); return;
+  if(!instanceUrl||!clientId) {
+    showToast('Instance URL and Consumer Key are required','#D63B3B'); return;
   }
-  sfdcUpdateStatusUI(false,'Connecting…','Requesting access token…');
-  const creds = {instanceUrl,username,clientId,clientSecret,password};
+  sfdcUpdateStatusUI(false,'Opening Salesforce login…','A browser popup will appear');
+  const creds = {instanceUrl, clientId, clientSecret, username:'', password:''};
   sfdcSaveCreds(creds);
   const ok = await sfdcFetchToken(creds);
   if(ok) {
     sfdcUpdateStatusUI(true,'Connected','Instance: '+instanceUrl.replace('https://',''));
     showToast('Connected to Salesforce ✓','#00B87A');
     renderSfdcErrorLog();
-    // Fetch user profile and set role automatically
     sfdcFetchCurrentUser().catch(function(){});
   } else {
     sfdcUpdateStatusUI(false,'Connection failed','Check credentials and try again');
   }
 }
 
+// ── OAuth 2.0 Authorization Code flow (browser popup) ────────────
+// Used instead of username-password flow which is disabled in External Client Apps.
+// Opens a Salesforce login popup → user logs in → token returned via postMessage.
+function sfdcOAuthPopup(instanceUrl, clientId) {
+  return new Promise(function(resolve, reject) {
+    var redirectUri = window.location.origin + window.location.pathname;
+    var authUrl = instanceUrl + '/services/oauth2/authorize'
+      + '?response_type=token'
+      + '&client_id=' + encodeURIComponent(clientId)
+      + '&redirect_uri=' + encodeURIComponent(redirectUri)
+      + '&scope=full+refresh_token'
+      + '&prompt=login';
+
+    var popup = window.open(authUrl, 'sfdcOAuth',
+      'width=600,height=700,scrollbars=yes,resizable=yes');
+
+    if(!popup) {
+      reject(new Error('Popup blocked — allow popups for this site and try again'));
+      return;
+    }
+
+    // Poll the popup URL for the access_token fragment
+    var poll = setInterval(function() {
+      try {
+        if(!popup || popup.closed) {
+          clearInterval(poll);
+          reject(new Error('Popup closed before completing login'));
+          return;
+        }
+        var href = popup.location.href;
+        if(href && href.indexOf('access_token=') !== -1) {
+          clearInterval(poll);
+          popup.close();
+          // Parse token from URL fragment
+          var fragment = href.split('#')[1] || href.split('?')[1] || '';
+          var params = {};
+          fragment.split('&').forEach(function(p) {
+            var kv = p.split('=');
+            params[decodeURIComponent(kv[0])] = decodeURIComponent(kv[1]||'');
+          });
+          if(params.access_token) {
+            resolve(params);
+          } else {
+            reject(new Error('No access token in response'));
+          }
+        }
+      } catch(e) {
+        // Cross-origin error while popup is on SFDC domain — normal, keep polling
+      }
+    }, 300);
+
+    // Timeout after 3 minutes
+    setTimeout(function() {
+      clearInterval(poll);
+      if(!popup.closed) popup.close();
+      reject(new Error('Login timed out — please try again'));
+    }, 180000);
+  });
+}
+
 async function sfdcFetchToken(creds) {
   const c = creds || sfdcLoadCreds();
   if(!c) return false;
   try {
-    const body = new URLSearchParams({
-      grant_type:    'password',
-      client_id:     c.clientId,
-      client_secret: c.clientSecret,
-      username:      c.username,
-      password:      c.password,
+    var tok = await sfdcOAuthPopup(c.instanceUrl, c.clientId);
+    sfdcSaveToken({
+      access_token: tok.access_token,
+      instance_url: tok.instance_url || c.instanceUrl,
+      token_type:   tok.token_type || 'Bearer',
+      fetchedAt:    Date.now(),
     });
-    const resp = await fetch(c.instanceUrl + '/services/oauth2/token', {
-      method:  'POST',
-      headers: {'Content-Type':'application/x-www-form-urlencoded'},
-      body:    body.toString(),
-    });
-    if(!resp.ok) {
-      const err = await resp.text();
-      sfdcLogError('Token fetch failed: ' + err);
-      return false;
-    }
-    const tok = await resp.json();
-    sfdcSaveToken({...tok, fetchedAt: Date.now()});
     return true;
   } catch(e) {
-    sfdcLogError('Token fetch error: ' + e.message);
+    sfdcLogError('OAuth login failed: ' + e.message);
     return false;
   }
 }
@@ -6329,17 +6375,15 @@ function sfdcAuthGate() {
 
 function sfdcAuthGateConnect() {
   var inst   = (document.getElementById('gate_instance_url')?.value||'').trim().replace(/\/$/,'');
-  var user   = (document.getElementById('gate_username')?.value||'').trim();
   var cid    = (document.getElementById('gate_client_id')?.value||'').trim();
   var csec   = (document.getElementById('gate_client_secret')?.value||'').trim();
-  var pass   = (document.getElementById('gate_password')?.value||'').trim();
   var btn    = document.getElementById('gate_btn');
   var err    = document.getElementById('gate_error');
-  if(!inst||!user||!cid||!csec||!pass) {
-    err.textContent = 'All fields are required.'; err.style.display='block'; return;
+  if(!inst||!cid) {
+    err.textContent = 'Instance URL and Consumer Key are required.'; err.style.display='block'; return;
   }
-  btn.textContent = 'Connecting…'; btn.disabled = true; err.style.display='none';
-  var creds = {instanceUrl:inst,username:user,clientId:cid,clientSecret:csec,password:pass};
+  btn.textContent = 'Opening Salesforce login…'; btn.disabled = true; err.style.display='none';
+  var creds = {instanceUrl:inst, clientId:cid, clientSecret:csec, username:'', password:''};
   sfdcSaveCreds(creds);
   sfdcFetchToken(creds).then(function(ok) {
     if(ok) {
@@ -6349,7 +6393,7 @@ function sfdcAuthGateConnect() {
       sfdcFetchCurrentUser().catch(function(){});
       init();
     } else {
-      err.textContent = 'Connection failed. Check your credentials and try again.';
+      err.textContent = 'Login failed or popup was closed. Please try again.';
       err.style.display = 'block';
       btn.textContent = 'Connect to Salesforce';
       btn.disabled = false;
@@ -7767,9 +7811,9 @@ buildPane8 = function() {
           <input id="gate_client_secret" type="password" placeholder="••••••••••••" style="width:100%;padding:9px 12px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#fff;font-size:12px;outline:none;" onfocus="this.style.borderColor='rgba(59,130,246,.5)'" onblur="this.style.borderColor='rgba(255,255,255,.1)'" onkeydown="if(event.key==='Enter')sfdcAuthGateConnect()"/>
         </div>
         <div>
-          <label style="display:block;font-size:10px;font-weight:600;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px;">Password + Security Token</label>
-          <input id="gate_password" type="password" placeholder="MyPassword + SecurityToken" style="width:100%;padding:9px 12px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#fff;font-size:12px;outline:none;" onfocus="this.style.borderColor='rgba(59,130,246,.5)'" onblur="this.style.borderColor='rgba(255,255,255,.1)'" onkeydown="if(event.key==='Enter')sfdcAuthGateConnect()"/>
-          <div style="font-size:10px;color:rgba(255,255,255,.25);margin-top:4px;">Password and Security Token concatenated, no space. e.g. <span style="font-family:monospace">MyPass3xGhAbc123</span></div>
+          <div style="font-size:11px;color:rgba(255,255,255,.5);padding:10px 12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:7px;line-height:1.6">
+            A Salesforce login window will open. Sign in with your usual Atlan credentials — no security token needed.
+          </div>
         </div>
         <button id="gate_btn" onclick="sfdcAuthGateConnect()" style="width:100%;padding:11px;background:#1B5FC4;border:none;border-radius:7px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;margin-top:4px;transition:background .15s;" onmouseover="this.style.background='#1450A8'" onmouseout="this.style.background='#1B5FC4'">Connect to Salesforce</button>
       </div>

@@ -4569,8 +4569,8 @@ const SFDC_PRODUCT_MAP = {
     'default': { pbeId:'01uDu000000jXhmIAE', name:'Out-of-the-Box Connector', code:'C-OTB' },
   },
   services: {
-    'Advisory Services': { pbeId:'01uQj000001mKS5IAM', name:'Professional Services - Custom', code:'P-PSC' },
-    'default':           { pbeId:'01uQj000001mKS5IAM', name:'Professional Services - Custom', code:'P-PSC' },
+    'Advisory Services': { pbeId:'01uQj0000022fIrIAI', name:'Professional Services - Custom', code:'P-PSC' },
+    'default':           { pbeId:'01uQj0000022fIrIAI', name:'Professional Services - Custom', code:'P-PSC' },
   },
   addons: {
     'npi':              { pbeId:'', name:'Non-Production Instance',           code:'A-NPI'  },
@@ -4595,6 +4595,10 @@ const SFDC_PRODUCT_MAP = {
     'leg_dq':           { pbeId:'', name:'Data Quality - Legacy Pricing',     code:'L-DQ'   },
   },
 };
+
+// Standard Pricebook ID — hardcoded as fallback so line items never fail
+// with FIELD_INTEGRITY_EXCEPTION due to pricebook mismatch
+window.STANDARD_PRICEBOOK_ID = window.STANDARD_PRICEBOOK_ID || '01s5e00000A6jMqAAJ';
 
 // Resolve a PricebookEntry for a line item using the product map
 // Returns { pbeId, name, code } or null if no match found
@@ -5129,7 +5133,7 @@ async function sfdcWriteDraftStepOne() {
     Status:         'Draft',
     Description:    snap.notes || '',
     ExpirationDate: snap.endDate || undefined,
-    Pricebook2Id:   window.STANDARD_PRICEBOOK_ID || undefined,
+    Pricebook2Id:   window.STANDARD_PRICEBOOK_ID || '01s5e00000A6jMqAAJ',
     // Note: standard Quote.Discount is read-only in SFDC — we store discount in Discount_Tier__c instead
   };
 
@@ -5248,7 +5252,7 @@ async function sfdcCreateQuoteRecord(snap, oppId, totalNet, totalList, disc) {
     ExpirationDate:  snap.endDate || null,
     Status:          'Draft',
     Description:     snap.notes || '',
-    Pricebook2Id:    window.STANDARD_PRICEBOOK_ID || undefined,
+    Pricebook2Id:    window.STANDARD_PRICEBOOK_ID || '01s5e00000A6jMqAAJ',
     // Note: standard Quote.Discount is read-only in SFDC — use Discount_Tier__c instead
   };
   // Custom Quote fields (need creating — see SFDC_FIELD_MAP.quote):
@@ -5289,6 +5293,20 @@ async function sfdcCreateQuoteRecord(snap, oppId, totalNet, totalList, disc) {
          saveDeal();
        }
      }
+    // Ensure Pricebook2Id is set on the Quote — patch explicitly if missing
+    // Handles Quotes created before Standard Pricebook ID was cached
+    if(state.sfdcQuoteId && window.STANDARD_PRICEBOOK_ID) {
+      try {
+        const pbCheck = await sfdcApiCall(
+          '/services/data/v59.0/sobjects/Quote/'+state.sfdcQuoteId+'?fields=Pricebook2Id', 'GET'
+        );
+        if(pbCheck && !pbCheck.Pricebook2Id) {
+          await sfdcApiCall('/services/data/v59.0/sobjects/Quote/'+state.sfdcQuoteId, 'PATCH',
+            { Pricebook2Id: window.STANDARD_PRICEBOOK_ID || '01s5e00000A6jMqAAJ' }
+          );
+        }
+      } catch(e) { /* best-effort */ }
+    }
     return state.sfdcQuoteId;
   } catch(e) {
     sfdcLogError('Quote record upsert failed: '+(e.message||e));
@@ -5353,6 +5371,15 @@ async function sfdcPushQuoteLineItems(quoteId, items) {
           }
         }
       } catch(e) { /* write without PricebookEntryId — line item still creates */ }
+    }
+
+    // If we still have no PricebookEntryId and the Quote has a pricebook assigned,
+    // skip this line item to avoid FIELD_INTEGRITY_EXCEPTION
+    if(!linePayload.PricebookEntryId && window.STANDARD_PRICEBOOK_ID) {
+      sfdcLogError('QuoteLineItem skipped (no PricebookEntry found): '+item.name+' — add product to SFDC pricebook and re-fetch in Field Mapping → Products');
+      results.failed++;
+      results.failedItems.push(item.name);
+      continue;
     }
 
     try {

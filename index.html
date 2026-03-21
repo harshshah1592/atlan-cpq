@@ -2282,8 +2282,8 @@ async function sfdcFetchOppDetails(oppId) {
     const oppSoql = 'SELECT Id,'+fm.oppName+','+fm.accountName+',' +
       fm.billingStreet+','+fm.billingCity+',' +
       fm.billingState+','+fm.billingPostalCode+','+fm.billingCountry+',' +
-      fm.recordType+' ' +
-      'FROM Opportunity WHERE Id=\'' + oppId + '\' LIMIT 1';
+      fm.recordType+',CloseDate' +
+      ' FROM Opportunity WHERE Id=\'' + oppId + '\' LIMIT 1';
     const oppRes = await sfdcApiCall(
       '/services/data/v59.0/query?q=' + encodeURIComponent(oppSoql), 'GET'
     );
@@ -2322,6 +2322,7 @@ async function sfdcFetchOppDetails(oppId) {
       contactEmail: contactEmail,
       oppName:      opp.Name || '',
       recordType:   (opp.RecordType && opp.RecordType.Name) || '',
+      closeDate:    opp.CloseDate || '',
     };
   } catch(e) {
     // Silent fail — not connected or no permission
@@ -2336,6 +2337,10 @@ function applyOppDetailsToModal(details) {
   // They don't exist yet but we store on a pendingPrefill object
   // that startDeal() reads when creating fresh state
   window._sfdcOppPrefill = details;
+  // Store oppName and closeDate for quote naming
+  if(details.closeDate) window._sfdcCloseDate = details.closeDate;
+  if(details.oppName)   window._sfdcOppName   = details.oppName;
+  if(details.accountName) window._sfdcAccountName = details.accountName;
   // Update hint to show what was fetched
   var hint = el('sfdcOppHint');
   if(hint) {
@@ -2446,7 +2451,26 @@ function startDeal(){
     if(!state.repEmail) state.repEmail   = SESSION_USER.email || '';
     state.repSfdcRole = SESSION_USER.sfdcRoleName || '';
     // Auto-name the quote
-    state.quoteName = (state.legal ? state.legal+' — ' : '') + 'v'+nextV;
+    // Auto-name: Account/Opp Name — Deal Type — Close Quarter
+    var _closeDate    = (window._sfdcCloseDate || '');
+    var _quarter      = getCloseQuarter(_closeDate);
+    var _accountName  = window._sfdcAccountName || state.legal || '';
+    var _oppName      = window._sfdcOppName     || state.legal || '';
+    var _qSuffix      = _quarter ? ' — ' + _quarter : '';
+    var _vSuffix = ' — v' + nextV;
+    if(dealType === 'NB') {
+      state.quoteName = _accountName + ' — New Business' + _qSuffix + _vSuffix;
+    } else if(dealType === 'UP') {
+      state.quoteName = _oppName + ' — Upsell' + _qSuffix + _vSuffix;
+    } else if(dealType === 'RN') {
+      state.quoteName = _accountName + ' — Renewal' + _qSuffix + _vSuffix;
+    } else {
+      state.quoteName = (_accountName || 'Draft') + ' — v' + nextV;
+    }
+    // Clear consumed globals
+    window._sfdcCloseDate   = null;
+    window._sfdcOppName     = null;
+    window._sfdcAccountName = null;
     if(dealType !== 'NB'){
       var cid = el('f_nbRefDeal')?.value||null;
       state.parentContractId = cid;
@@ -4829,6 +4853,31 @@ function sfdcProfileToRole(profileName) {
 // Fetch current SFDC user details and set SESSION_USER role automatically
 // Called after a successful sfdcConnect() or on page load if already connected
 
+// ── Close Quarter helper ──────────────────────────────────────────
+// Returns "Q1 FY26" format from a CloseDate string like "2026-03-31"
+function getCloseQuarter(dateStr) {
+  if(!dateStr) return '';
+  try {
+    var d = new Date(dateStr + 'T00:00:00');
+    var month = d.getMonth() + 1; // 1-12
+    var year  = d.getFullYear();
+    // Atlan fiscal year starts Feb 1 — Q1=Feb-Apr, Q2=May-Jul, Q3=Aug-Oct, Q4=Nov-Jan
+    var fy, q;
+    if(month >= 2) {
+      fy = year + 1;
+      if(month <= 4)       q = 'Q1';
+      else if(month <= 7)  q = 'Q2';
+      else if(month <= 10) q = 'Q3';
+      else                 q = 'Q4';
+    } else {
+      // January — still previous FY Q4
+      fy = year;
+      q  = 'Q4';
+    }
+    return q + ' FY' + String(fy).slice(-2);
+  } catch(e) { return ''; }
+}
+
 // ── Toast notification utility ────────────────────────────────────
 function showToast(msg, color, duration) {
   try {
@@ -6041,7 +6090,7 @@ function buildPane0(){
       ${(!state.legal || !state.contact || !state.email) ? '<div style="padding:10px 12px;background:#FEF3C7;border:1px solid #FDE68A;border-radius:8px;font-size:12px;color:#92400E;margin-bottom:12px">Some details weren\'t found in Salesforce. Fill them in below — they\'ll be written to Salesforce when you reach the Pricing Summary.</div>' : ''}
       <div class="g2">
         <div class="field"><label class="lbl">Legal Company Name<span class="req">*</span></label>
-          <input type="text" id="f_legal" value="${state.legal||''}" placeholder="Acme Corp Ltd." oninput="navUpdate();if(this.value&&!el('f_quoteName')?.dataset.manuallyEdited){var v=state.quoteVersion||1;state.quoteName=this.value+' \u2014 v'+v;var qn=el('f_quoteName');if(qn)qn.value=state.quoteName;}" ${isUP?'disabled':''}/></div>
+          <input type="text" id="f_legal" value="${state.legal||''}" placeholder="Acme Corp Ltd." oninput="navUpdate();if(this.value&&!el('f_quoteName')?.dataset.manuallyEdited){var v=state.quoteVersion||1;var _qt3=getCloseQuarter(state.startDate||'');var _qs3=_qt3?' — '+_qt3:'';if(state.dealType==='NB')state.quoteName=this.value+' — New Business'+_qs3+' — v'+v;else if(state.dealType==='UP')state.quoteName=this.value+' — Upsell'+_qs3+' — v'+v;else if(state.dealType==='RN')state.quoteName=this.value+' — Renewal'+_qs3+' — v'+v;else state.quoteName=this.value+' — v'+v;var qn=el('f_quoteName');if(qn)qn.value=state.quoteName;}" ${isUP?'disabled':''}/></div>
         <div class="field"><label class="lbl">Billing Address<span class="req">*</span></label>
           <input type="text" id="f_billing" value="${state.billing||''}" placeholder="123 Main St, City" ${isUP?'disabled':''}/></div>
         <div class="field"><label class="lbl">Primary Contact<span class="req">*</span></label>
@@ -7804,6 +7853,20 @@ function handleN8NCallback() {
 
 function checkUrlParams() {
   try {
+    // GitHub Pages 301 redirect strips query params — recover from sessionStorage
+    // (set by 404.html before redirect fires)
+    var storedSearch = sessionStorage.getItem('cpq_redirect_params');
+    if(storedSearch) {
+      sessionStorage.removeItem('cpq_redirect_params');
+      // Re-parse from stored search string
+      var stored = new URLSearchParams(storedSearch);
+      var storedOppId = stored.get('oppId') || stored.get('opp_id');
+      if(storedOppId && !new URLSearchParams(window.location.search).get('oppId')) {
+        // Inject into current URL context and re-run
+        window.history.replaceState({}, '', window.location.pathname + storedSearch);
+      }
+    }
+
     var params = new URLSearchParams(window.location.search);
     var oppId = params.get('oppId') || params.get('opp_id');
     var dealTypeParam = (params.get('dealType') || params.get('deal_type') || 'NB').toUpperCase();
@@ -7914,7 +7977,13 @@ function checkUrlParams() {
             if(details.contactEmail && !state.email)  state.email   = details.contactEmail;
             // Rebuild quote name now that we have the company name
             var v = state.quoteVersion || 1;
-            state.quoteName = (state.legal ? state.legal + ' — ' : '') + 'v' + v;
+            // Update quote name when legal name changes — preserve deal type format
+            var _qt2 = getCloseQuarter(state.startDate||'');
+            var _qs2 = _qt2 ? ' — ' + _qt2 : '';
+            if(state.dealType === 'NB') state.quoteName = state.legal + ' — New Business' + _qs2 + ' — v' + v;
+            else if(state.dealType === 'UP') state.quoteName = state.legal + ' — Upsell' + _qs2 + ' — v' + v;
+            else if(state.dealType === 'RN') state.quoteName = state.legal + ' — Renewal' + _qs2 + ' — v' + v;
+            else state.quoteName = state.legal + ' — v' + v;
           }
 
           showView('cpq');

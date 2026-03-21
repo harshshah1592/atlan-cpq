@@ -567,6 +567,20 @@ textarea{resize:vertical;min-height:60px}
           <option value="">— Select active contract —</option>
         </select>
         <div id="contractRefHint" class="hint" style="margin-top:4px">Account details and live SKUs will be pre-filled from this contract</div>
+
+        <!-- Fallback: prior Opp not in tool -->
+        <div style="margin-top:10px;padding:10px 14px;background:#F0F9FF;border:1px solid #BAE6FD;border-radius:7px">
+          <div style="font-size:11px;font-weight:700;color:#0369A1;margin-bottom:6px">📋 Prior deal not in this tool?</div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:8px">Enter the prior SFDC Opportunity ID — the tool will fetch ARR, dates, and account details directly from Salesforce.</div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input type="text" id="f_priorOppId" placeholder="Search Closed Won opportunity name…"
+              style="flex:1;padding:6px 10px;border:1px solid #BAE6FD;border-radius:6px;font-size:12px"
+              onkeydown="if(event.key==='Enter')lookupPriorOpp()"/>
+            <button onclick="lookupPriorOpp()" style="padding:6px 12px;border-radius:6px;border:none;background:#0369A1;color:#fff;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">Search</button>
+          </div>
+          <div id="priorOppHint" class="hint" style="margin-top:5px"></div>
+          <div id="priorOppList"></div>
+        </div>
       </div>
 
       <!-- NB duplicate warning -->
@@ -2282,7 +2296,11 @@ async function sfdcFetchOppDetails(oppId) {
     const oppSoql = 'SELECT Id,'+fm.oppName+','+fm.accountName+',' +
       fm.billingStreet+','+fm.billingCity+',' +
       fm.billingState+','+fm.billingPostalCode+','+fm.billingCountry+',' +
-      fm.recordType+',CloseDate' +
+      fm.recordType+',CloseDate,' +
+      'Legal_Name__c,Contract_Start_Date__c,Contract_Term_months__c,' +
+      'Billing_Frequency__c,Payment_Terms_net_days__c,' +
+      'Is_Purchase_Order_PO_required__c,Purchase_Order_PO__c,' +
+      'Accounts_Payable_Email__c,Atlan_Entity__c' +
       ' FROM Opportunity WHERE Id=\'' + oppId + '\' LIMIT 1';
     const oppRes = await sfdcApiCall(
       '/services/data/v59.0/query?q=' + encodeURIComponent(oppSoql), 'GET'
@@ -2323,6 +2341,16 @@ async function sfdcFetchOppDetails(oppId) {
       oppName:      opp.Name || '',
       recordType:   (opp.RecordType && opp.RecordType.Name) || '',
       closeDate:    opp.CloseDate || '',
+      // Customer/contract fields — pre-fill Step 1 from SFDC
+      legalName:    opp.Legal_Name__c || '',
+      startDate:    opp.Contract_Start_Date__c || '',
+      termMonths:   opp.Contract_Term_months__c || null,
+      billFreq:     opp.Billing_Frequency__c || '',
+      payTerms:     opp.Payment_Terms_net_days__c || '',
+      poRequired:   opp.Is_Purchase_Order_PO_required__c || false,
+      poNum:        opp.Purchase_Order_PO__c || '',
+      apEmail:      opp.Accounts_Payable_Email__c || '',
+      entity:       opp.Atlan_Entity__c || '',
     };
   } catch(e) {
     // Silent fail — not connected or no permission
@@ -2337,10 +2365,12 @@ function applyOppDetailsToModal(details) {
   // They don't exist yet but we store on a pendingPrefill object
   // that startDeal() reads when creating fresh state
   window._sfdcOppPrefill = details;
-  // Store oppName and closeDate for quote naming
-  if(details.closeDate) window._sfdcCloseDate = details.closeDate;
-  if(details.oppName)   window._sfdcOppName   = details.oppName;
-  if(details.accountName) window._sfdcAccountName = details.accountName;
+  // Store for quote naming
+  if(details.closeDate)   window._sfdcCloseDate     = details.closeDate;
+  if(details.oppName)     window._sfdcOppName       = details.oppName;
+  if(details.accountName) window._sfdcAccountName   = details.accountName;
+  // For Renewal: lock start date to this Opp's close date
+  if(dealType === 'RN' && details.closeDate) window._sfdcRenewalCloseDate = details.closeDate;
   // Update hint to show what was fetched
   var hint = el('sfdcOppHint');
   if(hint) {
@@ -2408,7 +2438,10 @@ function startDeal(){
     if(!sfdcOpp){ alert('Please enter a Salesforce Opportunity ID to create a quote.'); return; }
     if(dealType !== 'NB'){
       var contractRef = el('f_nbRefDeal')?.value||'';
-      if(!contractRef){ alert('Please select the parent contract for this '+dealTypeLabel(dealType)+'.'); return; }
+      if(!contractRef && !window._priorOppPrefill){
+        alert('Please select the parent contract — or use "Prior deal not in this tool?" to look up the prior Salesforce Opportunity.');
+        return;
+      }
     }
     state = freshState();
     state.dealType = dealType;
@@ -2419,9 +2452,11 @@ function startDeal(){
     state.dealId = 'Q-'+Math.floor(1000+Math.random()*9000)+'-v'+nextV;
     state.quoteStatus = 'Draft';
     nbRefDealId = null;
-    // ── Layer 1: prefill from most recent quote on this Opp (contract terms etc.) ──
+    // ── Layer 1: prefill from most recent quote on this Opp (v2+) ──
     var prevQuotes = getQuotesForOpp(sfdcOpp);
-    var prevQ = prevQuotes.length ? prevQuotes[prevQuotes.length-1] : null;
+    // Sort by version descending — most recent first
+    prevQuotes.sort(function(a,b){ return (b.quoteVersion||1)-(a.quoteVersion||1); });
+    var prevQ = prevQuotes.length ? prevQuotes[0] : null;
     if(prevQ) {
       state.legal       = prevQ.legal||'';
       state.billing     = prevQ.billing||'';
@@ -2436,14 +2471,26 @@ function startDeal(){
       state.repName     = prevQ.repName||'';
       state.repEmail    = prevQ.repEmail||'';
       state.termMonths  = prevQ.termMonths||12;
+      // For NB v2+: carry over start date too
+      if(dealType === 'NB' && prevQ.startDate) state.startDate = prevQ.startDate;
     }
-    // ── Layer 2: SFDC prefill overwrites company/contact fields (always fresher) ──
+    // ── Layer 2: SFDC prefill overwrites fields (always fresher than local) ──
     var sfPrefill = window._sfdcOppPrefill || null;
     if(sfPrefill) {
-      if(sfPrefill.accountName)  state.legal    = sfPrefill.accountName;
+      if(sfPrefill.accountName)  state.legal    = sfPrefill.legalName || sfPrefill.accountName;
       if(sfPrefill.billing)      state.billing  = sfPrefill.billing;
       if(sfPrefill.contactName)  state.contact  = sfPrefill.contactName;
       if(sfPrefill.contactEmail) state.email    = sfPrefill.contactEmail;
+      // Contract fields from Opp — only overwrite if SFDC has values
+      if(sfPrefill.termMonths)   state.termMonths  = sfPrefill.termMonths;
+      if(sfPrefill.billFreq)     state.billFreq    = sfPrefill.billFreq;
+      if(sfPrefill.payTerms)     state.payTerms    = sfPrefill.payTerms;
+      if(sfPrefill.entity)       state.entity      = sfPrefill.entity;
+      if(sfPrefill.apEmail)      state.email       = sfPrefill.apEmail;
+      if(sfPrefill.poNum)        state.poNum       = sfPrefill.poNum;
+      if(sfPrefill.poRequired !== undefined) state.poRequired = sfPrefill.poRequired;
+      // NB: don't overwrite startDate from SFDC for NB — rep enters it
+      // For RN: startDate comes from renewalCloseDate (handled below)
       window._sfdcOppPrefill = null; // consume once
     }
     // ── Always stamp the current user as the rep ──
@@ -2471,17 +2518,164 @@ function startDeal(){
     window._sfdcCloseDate   = null;
     window._sfdcOppName     = null;
     window._sfdcAccountName = null;
+
+    // ── Renewal: lock start date — comes from renewal Opp CloseDate, not parent ──
+    // Store locked date on state — UI will enforce read-only for non-RevOps
+    if(dealType === 'RN') {
+      // startDate for renewal = the renewal Opp's close date (fetched from SFDC)
+      var _rnClose = window._sfdcRenewalCloseDate || '';
+      if(_rnClose) {
+        state.startDate = _rnClose;
+        state.renewalStartDateLocked = true; // locked for non-RevOps
+      }
+      window._sfdcRenewalCloseDate = null;
+    } else {
+      state.renewalStartDateLocked = false;
+    }
     if(dealType !== 'NB'){
       var cid = el('f_nbRefDeal')?.value||null;
       state.parentContractId = cid;
       nbRefDealId = cid;
       if(cid){ prefillFromContract(cid); }
+
+      // If no tool-based parent but rep looked up a prior SFDC Opp — apply it
+      if(!cid && window._priorOppPrefill) {
+        var p = window._priorOppPrefill;
+        if(p.accountName) state.legal   = p.accountName;
+        if(p.billing)     state.billing = p.billing;
+        if(p.amount)      state.priorARR = p.amount;
+        if(p.closeDate)   window._sfdcCloseDate = p.closeDate;
+        if(p.oppName)     window._sfdcOppName   = p.oppName;
+        if(p.accountName) window._sfdcAccountName = p.accountName;
+        // Re-generate quote name with the fetched data
+        var _cq2 = getCloseQuarter(p.closeDate||'');
+        var _cqs2 = _cq2 ? ' — ' + _cq2 : '';
+        var _cv2 = ' — v' + nextV;
+        if(dealType === 'UP') state.quoteName = (p.oppName||p.accountName) + ' — Upsell' + _cqs2 + _cv2;
+        if(dealType === 'RN') state.quoteName = p.accountName + ' — Renewal' + _cqs2 + _cv2;
+        window._priorOppPrefill = null;
+      }
     }
     closeDealTypeModal();
     step=0;
     renderCPQ();
     showView('cpq');
   }catch(e){ console.error('startDeal error:',e); alert('Error creating quote: '+e.message); }
+}
+
+function validateUpsellStartDate() {
+  if(state.dealType !== 'UP' || !state.parentStartDate) return true;
+  var sd = v('f_startDate') || state.startDate;
+  if(!sd) return true;
+  var parentDay = new Date(state.parentStartDate + 'T00:00:00').getDate();
+  var newDay    = new Date(sd + 'T00:00:00').getDate();
+  var hint = document.getElementById('upsellStartHint');
+  if(!hint) {
+    hint = document.createElement('div');
+    hint.id = 'upsellStartHint';
+    hint.style.cssText = 'font-size:11px;margin-top:3px';
+    var sdField = document.getElementById('f_startDate');
+    if(sdField && sdField.parentNode) sdField.parentNode.appendChild(hint);
+  }
+  if(newDay !== parentDay) {
+    hint.innerHTML = '<span style="color:#D63B3B">⚠ Must be day ' + parentDay + ' of any month (same as parent contract)</span>';
+    return false;
+  } else {
+    hint.innerHTML = '<span style="color:#00B87A">✓ Valid — full month proration will be calculated</span>';
+    return true;
+  }
+}
+
+async function lookupPriorOpp() {
+  var searchVal = (el('f_priorOppId')?.value||'').trim();
+  var hint      = el('priorOppHint');
+  var listEl    = el('priorOppList');
+  if(!searchVal) {
+    if(hint) hint.innerHTML = '<span style="color:#D63B3B">Enter an Opportunity name to search</span>';
+    return;
+  }
+  if(hint) hint.innerHTML = '<span style="color:var(--muted)">Searching Closed Won opportunities…</span>';
+  if(listEl) listEl.innerHTML = '';
+
+  try {
+    // Get current account name from the Opp being quoted (to filter same account)
+    var currentOppId = (el('f_sfdcOppId')?.value||'').trim();
+    var accountFilter = '';
+    if(currentOppId && currentOppId.length >= 15) {
+      var accRes = await sfdcApiCall(
+        '/services/data/v59.0/query?q=' + encodeURIComponent(
+          "SELECT AccountId FROM Opportunity WHERE Id='" + currentOppId + "' LIMIT 1"
+        ), 'GET'
+      );
+      if(accRes && accRes.records && accRes.records[0] && accRes.records[0].AccountId) {
+        accountFilter = " AND AccountId='" + accRes.records[0].AccountId + "'";
+      }
+    }
+
+    var soql = "SELECT Id, Name, CloseDate, Amount, " +
+      "Account.Name, Account.BillingStreet, Account.BillingCity, " +
+      "Account.BillingState, Account.BillingPostalCode, Account.BillingCountry " +
+      "FROM Opportunity WHERE StageName='Closed Won'" + accountFilter +
+      " AND Name LIKE '%" + searchVal.replace(/'/g,"\'") + "%'" +
+      " ORDER BY CloseDate DESC LIMIT 10";
+
+    var res = await sfdcApiCall('/services/data/v59.0/query?q=' + encodeURIComponent(soql), 'GET');
+
+    if(!res || !res.records || !res.records.length) {
+      if(hint) hint.innerHTML = '<span style="color:#D63B3B">No Closed Won opportunities found matching "' + escHtml(searchVal) + '"</span>';
+      return;
+    }
+
+    hint.innerHTML = '<span style="color:var(--muted)">' + res.records.length + ' result(s) — click to select</span>';
+
+    // Render results list
+    if(!listEl) {
+      listEl = document.createElement('div');
+      listEl.id = 'priorOppList';
+      listEl.style.cssText = 'margin-top:8px;border:1px solid var(--border);border-radius:6px;overflow:hidden;max-height:200px;overflow-y:auto';
+      hint.parentNode.appendChild(listEl);
+    }
+
+    listEl.innerHTML = res.records.map(function(opp) {
+      var acc = opp.Account || {};
+      var billingParts = [acc.BillingStreet, acc.BillingCity, acc.BillingState, acc.BillingPostalCode, acc.BillingCountry].filter(Boolean);
+      var encoded = encodeURIComponent(JSON.stringify({
+        oppId:       opp.Id,
+        oppName:     opp.Name||'',
+        accountName: acc.Name||'',
+        billing:     billingParts.join(', '),
+        closeDate:   opp.CloseDate||'',
+        amount:      opp.Amount||0,
+      }));
+      return '<div onclick="selectPriorOpp(\'' + opp.Id + '\',decodeURIComponent(\'' + encoded + '\'))" ' +
+        'style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);font-size:12px;transition:background .1s" ' +
+        'onmouseover="this.style.background=\'#F0F9FF\'" onmouseout="this.style.background=\'\'">'+
+        '<div style="font-weight:600;color:var(--text)">' + escHtml(opp.Name) + '</div>' +
+        '<div style="color:var(--muted);font-size:11px">' +
+          (opp.Amount ? '$' + Math.round(opp.Amount).toLocaleString() + ' · ' : '') +
+          'Closed ' + (opp.CloseDate||'—') +
+        '</div></div>';
+    }).join('');
+
+  } catch(e) {
+    if(hint) hint.innerHTML = '<span style="color:#D63B3B">Search failed: ' + escHtml(e.message||String(e)) + '</span>';
+  }
+}
+
+function selectPriorOpp(oppId, encodedData) {
+  try {
+    var data = JSON.parse(encodedData);
+    window._priorOppPrefill = data;
+    var hint   = el('priorOppHint');
+    var listEl = el('priorOppList');
+    if(hint) hint.innerHTML = '<span style="color:#00B87A">✓ Selected: <strong>' + escHtml(data.oppName) + '</strong>' +
+      (data.amount ? ' · $' + Math.round(data.amount).toLocaleString() + ' ARR' : '') + '</span>';
+    if(listEl) listEl.innerHTML = '';
+    var input = el('f_priorOppId');
+    if(input) input.value = data.oppName; // show name in field
+    var btn = el('btnStartDeal');
+    if(btn) btn.disabled = false;
+  } catch(e) {}
 }
 
 function prefillFromContract(contractId){
@@ -2542,6 +2736,8 @@ function prefillFromNBDeal(nbId){
     state.termMonths=moRemaining;
     state.startDate=now.toISOString().slice(0,10);
     state.nbEndDate=end.toISOString().slice(0,10);
+    // Store parent start date for upsell day-of-month validation
+    state.parentStartDate = nb.startDate || '';
     // Auto-fill platform from NB deal
     state.platformTier=nb.platformTier||null;
     state.nbPlatformTier=nb.platformTier||null;  // remember NB tier for credit calc
@@ -4249,6 +4445,19 @@ async function sfdcWriteStatusChange(newStatus, actorName, extra) {
     if(oppId && oppStatus) {
       const oppPatch = {};
       oppPatch[F('oppWrite','approvalStatus')] = oppStatus;
+      // On Submit — also write all customer/contract fields to Opp
+      if(newStatus === 'In Review') {
+        const snap = state;
+        if(snap.legal)      oppPatch[F('oppWrite','legalName')]         = snap.legal;
+        if(snap.startDate)  oppPatch[F('oppWrite','contractStartDate')] = snap.startDate;
+        if(snap.termMonths) oppPatch[F('oppWrite','contractTerm')]      = snap.termMonths;
+        if(snap.billFreq)   oppPatch[F('oppWrite','billingFrequency')]  = snap.billFreq;
+        if(snap.payTerms)   oppPatch[F('oppWrite','paymentTerms')]      = snap.payTerms;
+        oppPatch[F('oppWrite','poRequired')]                             = snap.poRequired || false;
+        if(snap.poNum)      oppPatch[F('oppWrite','poNumber')]          = snap.poNum;
+        if(snap.email)      oppPatch[F('oppWrite','apEmail')]           = snap.email;
+        if(snap.entity)     oppPatch[F('oppWrite','atlanEntity')]       = snap.entity;
+      }
       await sfdcApiCall('/services/data/v59.0/sobjects/Opportunity/' + oppId, 'PATCH', oppPatch);
     }
   } catch(e) {
@@ -4508,8 +4717,18 @@ const SFDC_FIELD_MAP = {
 
   // ── Opportunity fields (written back on status change) ──────────
   oppWrite: {
-    approvalStatus:  'Approval_Status__c',        // Picklist on Opp — synced for pipeline reporting. CREATE THIS.
-    recordTypeId:    'RecordTypeId',              // Standard — used to detect deal type from button URL
+    approvalStatus:    'Approval_Status__c',
+    recordTypeId:      'RecordTypeId',
+    // ── Customer/contract fields written back from tool on save ──
+    legalName:         'Legal_Name__c',
+    contractStartDate: 'Contract_Start_Date__c',
+    contractTerm:      'Contract_Term_months__c',
+    billingFrequency:  'Billing_Frequency__c',
+    paymentTerms:      'Payment_Terms_net_days__c',
+    poRequired:        'Is_Purchase_Order_PO_required__c',
+    poNumber:          'Purchase_Order_PO__c',
+    apEmail:           'Accounts_Payable_Email__c',
+    atlanEntity:       'Atlan_Entity__c',
   },
 
   // ── Quote fields (written on every push) ────────────────────────
@@ -5272,29 +5491,24 @@ async function sfdcWriteDraftStepOne() {
     await sfdcPushQuoteLineItems(state.sfdcQuoteId, items);
   }
 
-  // ── 3. Mirror Draft status to Opportunity ────────────────────────
+  // ── 3. Write customer + contract fields back to Opportunity ────────
   try {
     const oppPatch = {};
     oppPatch[F('oppWrite','approvalStatus')] = 'Not Submitted';
 
-    // Write back any contact/billing details rep may have filled in
-    // Only writes to Opp Description if currently blank
-    if(snap.contact || snap.email || snap.billing) {
-      const oppRead = await sfdcApiCall(
-        '/services/data/v59.0/sobjects/Opportunity/' + oppId + '?fields=Description',
-        'GET'
-      );
-      if(oppRead && !oppRead.Description) {
-        oppPatch.Description = [
-          snap.contact ? 'Contact: '  + snap.contact  : '',
-          snap.email   ? 'Email: '    + snap.email    : '',
-          snap.billing ? 'Billing: '  + snap.billing  : '',
-        ].filter(Boolean).join('\n');
-      }
-    }
+    // Always write all customer/contract fields from Step 1
+    if(snap.legal)       oppPatch[F('oppWrite','legalName')]         = snap.legal;
+    if(snap.startDate)   oppPatch[F('oppWrite','contractStartDate')] = snap.startDate;
+    if(snap.termMonths)  oppPatch[F('oppWrite','contractTerm')]      = snap.termMonths;
+    if(snap.billFreq)    oppPatch[F('oppWrite','billingFrequency')]  = snap.billFreq;
+    if(snap.payTerms)    oppPatch[F('oppWrite','paymentTerms')]      = snap.payTerms;
+    oppPatch[F('oppWrite','poRequired')]                              = snap.poRequired || false;
+    if(snap.poNum)       oppPatch[F('oppWrite','poNumber')]          = snap.poNum;
+    if(snap.email)       oppPatch[F('oppWrite','apEmail')]           = snap.email;
+    if(snap.entity)      oppPatch[F('oppWrite','atlanEntity')]       = snap.entity;
 
     await sfdcApiCall('/services/data/v59.0/sobjects/Opportunity/' + oppId, 'PATCH', oppPatch);
-  } catch(e) { /* silent */ }
+  } catch(e) { sfdcLogError('Opp write-back failed: ' + (e.message||e)); }
 
   // ── 4. Create OpportunityContactRole if not already there ────────
   if(snap.contact && snap.email) {
@@ -6101,7 +6315,12 @@ function buildPane0(){
       <div class="sub-lbl">Contract Terms</div>
       <div class="g3">
         <div class="field"><label class="lbl">Contract Start Date<span class="req">*</span></label>
-          <input type="date" id="f_startDate" value="${state.startDate||''}" oninput="navUpdate()" ${isRN?'disabled':''}/></div>
+          ${state.renewalStartDateLocked && SESSION_USER.sfdcProfile !== 'System Administrator' && SESSION_USER.sfdcProfile !== 'Atlan Administrator'
+            ? `<div style="padding:7px 10px;background:#F8FAFC;border:1px solid var(--border);border-radius:var(--rs);font-family:var(--mono);font-size:13px;font-weight:600">${state.startDate||'—'}</div>
+               <div class="hint" style="color:#D63B3B">🔒 Locked for Renewal — only RevOps can change this</div>`
+            : `<input type="date" id="f_startDate" value="${state.startDate||''}" oninput="navUpdate();validateUpsellStartDate()" ${isRN && !state.renewalStartDateLocked?'':''}/>
+               ${isUP && state.parentStartDate ? `<div class="hint" style="color:#0369A1">⚡ Upsell: must start on day ${new Date(state.parentStartDate+'T00:00:00').getDate()} of any month</div>` : ''}`
+          }</div>
         <div class="field"><label class="lbl">Contract Term (months)<span class="req">*</span></label>
           <input type="number" id="f_termMonths" min="1" max="60" value="${state.termMonths||12}" oninput="onTermChange()" ${isUP?'disabled':''}/>
           <div class="hint">${isUP?'Co-term: '+state.termMonths+' months remaining':'12=1yr, 18=1.5yr, 36=3yr'}</div></div>
@@ -6575,7 +6794,7 @@ function buildPane8(){
 // NAVIGATION
 // ═══════════════════════════════════════════════════════════════════
 function canAdvance(){
-  if(step===0){const legal=v('f_legal')||state.legal;const entity=v('f_entity')||state.entity;const cont=v('f_contact')||state.contact;const em=v('f_email')||state.email;const sd=v('f_startDate')||state.startDate;return!!(legal&&cont&&em&&sd&&entity);}
+  if(step===0){const legal=v('f_legal')||state.legal;const entity=v('f_entity')||state.entity;const cont=v('f_contact')||state.contact;const em=v('f_email')||state.email;const sd=v('f_startDate')||state.startDate;if(!legal||!cont||!em||!sd||!entity) return false;if(state.dealType==='UP'&&state.parentStartDate&&sd){var parentDay=new Date(state.parentStartDate+'T00:00:00').getDate();var newDay=new Date(sd+'T00:00:00').getDate();if(newDay!==parentDay) return false;}return true;}
   if(step===1) {
     if(state.platformTier === 'Legacy') return state.platformList > 0;
     return !!state.platformTier && state.platformList > 0;

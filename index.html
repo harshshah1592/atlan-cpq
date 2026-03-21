@@ -4046,6 +4046,11 @@ function getRenewalLanguage(){
 }
 function getAdditionalAssetTable(){
   const tier=state.platformTier;if(!tier||tier==='Standard')return'';
+  // When overage pricing is selected, the discounted table replaces this static one
+  if(state.includeOverage && ['Standard','Enterprise','Biz-Critical'].includes(tier)) return '';
+  // When rep has opted into overage pricing, the discounted overage table
+  // replaces the static list-price table — don't show both
+  if(state.includeOverage && ['Standard','Enterprise','Biz-Critical'].includes(tier)) return '';
   const rows=tier==='Enterprise'
     ?[{r:'1M–10M',p:'$41,000'},{r:'>10M',p:'$21,000'},{r:'>50M',p:'$17,000'},{r:'>100M',p:'$13,000'}]
     :[{r:'1M–10M',p:'$63,000'},{r:'>10M',p:'$31,000'},{r:'>50M',p:'$25,000'},{r:'>100M',p:'$19,000'}];
@@ -6857,7 +6862,10 @@ function getOverageOFHtml() {
 
   return '<div style="margin-top:24px;page-break-inside:avoid">'
     + '<div style="font-size:13px;font-weight:700;color:#1B2F6E;margin-bottom:10px;border-bottom:2px solid #1B2F6E;padding-bottom:4px">Overage Pricing Schedule — ' + tier + (disc > 0 ? ' (' + disc.toFixed(1) + '% discount applied)' : '') + '</div>'
-    + '<div style="font-size:11px;color:#666;margin-bottom:8px">The following rates apply for usage beyond contracted limits. All overage is billed in arrears.</div>'
+    + '<div style="font-size:10px;color:#333;line-height:1.8;padding:9px 10px;border:1px solid #E0E0E0;border-radius:4px;margin-bottom:12px">'
+    + 'In the event the Customer exceeds the Baseline Volume in a given 12 month period, the parties will mutually agree on the additional assets required from the next 12 month period onwards at the below listed rates, which will be added to the upcoming invoices. Thereafter, the Baseline Volume will be enhanced by the volume agreed. For avoidance of doubt, as "Asset" includes anything that has an asset profile in Atlan\'s product within the subscription services, where asset profile includes without limitation, associated metadata like owner and description.'
+    + '<br/><br/>Parties understand that: (i) Atlan will not retroactively charge for over usage in the preceding 12 month period; and (ii) any un-used Baseline Volume will not be carried forward. All usage will be recorded within the Subscription Services and available to the Customer.'
+    + '</div>'
     + '<div style="font-weight:700;font-size:11px;color:#333;margin-bottom:4px">Additional Assets</div>'
     + '<table style="' + tblStyle + '">'
     + '<thead><tr><th style="' + thStyle + '">Asset Band</th><th style="' + thStyle + '">List Price</th><th style="' + thStyle + '">Contracted Rate</th></tr></thead>'

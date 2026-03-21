@@ -1935,6 +1935,17 @@ const PLATFORM = {
     isLegacy:true
   }
 };
+// Overage list prices — per million assets / per seat per month
+// Keyed by platform tier. Users: same bands across all tiers.
+const OVERAGE_ASSET_PRICES = {
+  'Standard':     [{label:'1M–10M', ppm:21000},{label:'10M–50M', ppm:10000},{label:'50M–100M', ppm:8000},{label:'>100M', ppm:6000}],
+  'Enterprise':   [{label:'1M–10M', ppm:41000},{label:'10M–50M', ppm:21000},{label:'50M–100M', ppm:17000},{label:'>100M', ppm:13000}],
+  'Biz-Critical': [{label:'1M–10M', ppm:63000},{label:'10M–50M', ppm:31000},{label:'50M–100M', ppm:25000},{label:'>100M', ppm:19000}],
+};
+const OVERAGE_USER_PRICES = {
+  Admin:  [{label:'1–100 seats', ppsm:200},{label:'>100 seats', ppsm:100},{label:'>500 seats', ppsm:80},{label:'>1,000 seats', ppsm:60}],
+  Member: [{label:'1–100 seats', ppsm:50}, {label:'>100 seats', ppsm:25}, {label:'>500 seats', ppsm:20}, {label:'>1,000 seats', ppsm:15}],
+};
 const CONNECTOR_PRICES={Standard:2000,Enterprise:2000,"Biz-Critical":2000,Legacy:2000};
 const CONNECTOR_TARGET={Standard:1600,Enterprise:1600,"Biz-Critical":1600,Legacy:1600};
 const ADMIN_BANDS=[{max:100,list:200,target:160},{max:500,list:100,target:80},{max:1000,list:120,target:96},{max:Infinity,list:60,target:48}];
@@ -2134,6 +2145,9 @@ function freshState(){
     quoteRejectedAt:null,
     contractId:'',
     status:'Draft',
+    // ── Overage pricing (New Pricing SKUs only) ──
+    includeOverage: false,   // rep opts in at Summary step
+    overageDisc:    0,       // single blended % off list for all overage tiers
   };
 }
 let state = freshState();
@@ -4253,6 +4267,7 @@ function renderOrderForm(){
       + '<table class="of-tbl"><thead><tr><th>Service</th><th style="text-align:center">Qty</th><th>List Price</th><th>Net Price</th><th>Disc %</th><th>Unit</th></tr></thead>'
       + '<tbody>' + svcLineRows + '</tbody></table>') : ''}
     ${getAdditionalAssetTable()}
+    ${getOverageOFHtml()}
     ${mktTerms?('<div style="margin-bottom:12px;padding:9px 10px;background:#F5F5F5;border-radius:4px;font-size:10px"><div style="font-weight:700;margin-bottom:3px">Marketing & Reference Terms</div><div style="color:#444;line-height:1.6">'+(mktTerms)+'</div></div>'):''}
     ${notes?('<div style="margin-bottom:12px;padding:9px 10px;background:#FFF8E1;border:1px solid #FFE082;border-radius:4px;font-size:10px"><div style="font-weight:700;margin-bottom:3px;color:#E65100">Special Conditions</div><div style="color:#444">'+(notes)+'</div></div>'):''}
     ${comments?('<div style="margin-bottom:12px;padding:9px 10px;background:#E8F5E9;border:1px solid #A5D6A7;border-radius:4px;font-size:10px"><div style="font-weight:700;margin-bottom:3px;color:#2E7D32">Approval Notes</div><div style="color:#444">'+(comments)+'</div></div>'):''}
@@ -5864,6 +5879,8 @@ function saveDeal(){
     })(),
     contracted: state.contracted||false,
     contractedAt: state.contractedAt||null,
+    includeOverage: state.includeOverage||false,
+    overageDisc:    state.overageDisc||0,
   };
   const idx=deals.findIndex(d=>d.dealId===snap.dealId);
   if(idx>=0) deals[idx]=snap; else deals.unshift(snap);
@@ -6318,8 +6335,8 @@ function buildPane0(){
           ${state.renewalStartDateLocked && SESSION_USER.sfdcProfile !== 'System Administrator' && SESSION_USER.sfdcProfile !== 'Atlan Administrator'
             ? `<div style="padding:7px 10px;background:#F8FAFC;border:1px solid var(--border);border-radius:var(--rs);font-family:var(--mono);font-size:13px;font-weight:600">${state.startDate||'—'}</div>
                <div class="hint" style="color:#D63B3B">🔒 Locked for Renewal — only RevOps can change this</div>`
-            : `<input type="date" id="f_startDate" value="${state.startDate||''}" oninput="navUpdate();validateUpsellStartDate()" ${isRN && !state.renewalStartDateLocked?'':''}/>
-               ${isUP && state.parentStartDate ? `<div class="hint" style="color:#0369A1">⚡ Upsell: must start on day ${new Date(state.parentStartDate+'T00:00:00').getDate()} of any month</div>` : ''}`
+            : '<input type="date" id="f_startDate" value="' + (state.startDate||'') + '" oninput="navUpdate();validateUpsellStartDate()"/>'
+               + (isUP && state.parentStartDate ? '<div class="hint" style="color:#0369A1">⚡ Upsell: must start on day ' + new Date(state.parentStartDate+'T00:00:00').getDate() + ' of any month</div>' : '')
           }</div>
         <div class="field"><label class="lbl">Contract Term (months)<span class="req">*</span></label>
           <input type="number" id="f_termMonths" min="1" max="60" value="${state.termMonths||12}" oninput="onTermChange()" ${isUP?'disabled':''}/>
@@ -6681,27 +6698,177 @@ function buildPane4(){
   // No ramp panel — Advisory Services is a one-time fee
 }
 function buildPane5(){
-  el('pane5').innerHTML=`
-    <div class="card">
-      <div class="card-title"><div class="step-chip">6</div>
-        <div><div class="card-title-text">Pricing Summary</div></div>
-      </div>
-      <div class="stat-row" id="summaryStats"></div>
-      <div id="tierBanner"></div>
-      <div style="margin-top:12px"><div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:7px">Approval Thresholds</div>
-        <div class="tier-scale" id="tierScale"></div></div>
-    </div>
-    <div class="card">
-      <div style="font-size:12px;font-weight:700;margin-bottom:12px">Line Items</div>
-      <div style="overflow-x:auto"><table class="sum-tbl">
-        <thead><tr><th>Item</th><th>Category</th><th>List</th><th>Net</th><th>Discount</th><th>%</th></tr></thead>
-        <tbody id="summaryBody"></tbody>
-        <tfoot id="summaryFoot"></tfoot>
-      </table></div>
-      <div id="summaryDealIntel"></div>
-    </div>`;
+  var isNewPricing = ['Standard','Enterprise','Biz-Critical'].includes(state.platformTier);
+  var overageMb = state.includeOverage ? '14px' : '0';
+  var overageInnerHtml = '';
+  if(state.includeOverage) {
+    overageInnerHtml =
+      '<div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:#F0F9FF;border:1px solid #BAE6FD;border-radius:var(--rs);margin-bottom:14px">'
+      + '<label style="font-size:12px;font-weight:700;color:#0369A1;white-space:nowrap">Overage Discount %</label>'
+      + '<div style="display:flex;align-items:center;gap:6px">'
+      + '<input type="number" id="f_overageDisc" min="0" max="100" step="0.5"'
+      + ' value="' + (state.overageDisc||0) + '" placeholder="0"'
+      + ' oninput="state.overageDisc=Math.min(100,Math.max(0,parseFloat(this.value)||0));renderOverageTables()"'
+      + ' style="width:80px;padding:6px 10px;border:1px solid #BAE6FD;border-radius:6px;font-size:13px;font-weight:700"/>'
+      + '<span style="font-size:12px;color:#0369A1">% off list</span>'
+      + '</div>'
+      + '<span style="font-size:11px;color:var(--muted)">Applied uniformly across all overage tiers — informational only, no approval required</span>'
+      + '</div>'
+      + '<div id="overageTables"></div>';
+  }
+  var overageCardHtml = '';
+  if(isNewPricing) {
+    overageCardHtml =
+      '<div class="card" id="overageCard">'
+      + '<div style="display:flex;align-items:center;gap:12px;margin-bottom:' + overageMb + '">'
+      + '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:700">'
+      + '<input type="checkbox" id="f_includeOverage" ' + (state.includeOverage?'checked':'')
+      + ' onchange="state.includeOverage=this.checked;buildPane5()"'
+      + ' style="width:16px;height:16px;cursor:pointer"/>'
+      + ' Include Overage Pricing in Order Form'
+      + '</label>'
+      + '<span style="font-size:11px;color:var(--muted)">Adds usage-based overage tables for Additional Assets &amp; Users</span>'
+      + '</div>'
+      + overageInnerHtml
+      + '</div>';
+  }
+  el('pane5').innerHTML =
+    '<div class="card">'
+    + '<div class="card-title"><div class="step-chip">6</div>'
+    + '<div><div class="card-title-text">Pricing Summary</div></div>'
+    + '</div>'
+    + '<div class="stat-row" id="summaryStats"></div>'
+    + '<div id="tierBanner"></div>'
+    + '<div style="margin-top:12px"><div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:7px">Approval Thresholds</div>'
+    + '<div class="tier-scale" id="tierScale"></div></div>'
+    + '</div>'
+    + '<div class="card">'
+    + '<div style="font-size:12px;font-weight:700;margin-bottom:12px">Line Items</div>'
+    + '<div style="overflow-x:auto"><table class="sum-tbl">'
+    + '<thead><tr><th>Item</th><th>Category</th><th>List</th><th>Net</th><th>Discount</th><th>%</th></tr></thead>'
+    + '<tbody id="summaryBody"></tbody>'
+    + '<tfoot id="summaryFoot"></tfoot>'
+    + '</table></div>'
+    + '<div id="summaryDealIntel"></div>'
+    + '</div>'
+    + overageCardHtml;
   renderSummaryStep();
+  if(state.includeOverage && isNewPricing) renderOverageTables();
 }
+function renderOverageTables() {
+  var el2 = document.getElementById('overageTables');
+  if(!el2) return;
+  var tier = state.platformTier;
+  var disc = parseFloat(state.overageDisc) || 0;
+  var assetBands = OVERAGE_ASSET_PRICES[tier] || OVERAGE_ASSET_PRICES['Enterprise'];
+
+  function netPrice(list) {
+    return Math.round(list * (1 - disc/100));
+  }
+  function discCell(list) {
+    var net = netPrice(list);
+    var pct2 = list > 0 ? ((list-net)/list*100).toFixed(1) : '0.0';
+    return '<td style="color:var(--muted);font-size:11px">' + pct2 + '%</td>';
+  }
+
+  // ── Assets table ──
+  var assetRows = assetBands.map(function(b) {
+    var listPPM = b.ppm;
+    var netPPM  = netPrice(listPPM);
+    return '<tr>'
+      + '<td>' + b.label + '</td>'
+      + '<td class="mono" style="color:var(--muted)">' + fmt(listPPM) + '/M/yr</td>'
+      + '<td class="mono" style="font-weight:700">' + fmt(netPPM) + '/M/yr</td>'
+      + discCell(listPPM)
+      + '</tr>';
+  }).join('');
+
+  // ── Users table (Admin + Member) ──
+  var userTypes = ['Admin','Member'];
+  var userRows = OVERAGE_USER_PRICES['Admin'].map(function(b, i) {
+    return '<tr>'
+      + '<td>' + b.label + '</td>'
+      + '<td class="mono" style="color:var(--muted)">' + fmt(OVERAGE_USER_PRICES['Admin'][i].ppsm) + '/seat/mo</td>'
+      + '<td class="mono" style="font-weight:700">' + fmt(netPrice(OVERAGE_USER_PRICES['Admin'][i].ppsm)) + '/seat/mo</td>'
+      + discCell(OVERAGE_USER_PRICES['Admin'][i].ppsm)
+      + '<td class="mono" style="color:var(--muted)">' + fmt(OVERAGE_USER_PRICES['Member'][i].ppsm) + '/seat/mo</td>'
+      + '<td class="mono" style="font-weight:700">' + fmt(netPrice(OVERAGE_USER_PRICES['Member'][i].ppsm)) + '/seat/mo</td>'
+      + discCell(OVERAGE_USER_PRICES['Member'][i].ppsm)
+      + '</tr>';
+  }).join('');
+
+  var tableStyle = 'width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px';
+  var thStyle = 'padding:7px 10px;background:#1B5FC4;color:#fff;font-size:11px;font-weight:700;text-align:left';
+  var tdStyle = 'padding:6px 10px;border-bottom:1px solid var(--border)';
+
+  el2.innerHTML =
+    '<div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">Overage Preview — ' + tier + '</div>'
+    + '<table style="' + tableStyle + '">'
+    + '<thead><tr>'
+    + '<th style="' + thStyle + '">Asset Band</th>'
+    + '<th style="' + thStyle + '">List (per M/yr)</th>'
+    + '<th style="' + thStyle + '">Net (per M/yr)</th>'
+    + '<th style="' + thStyle + '">Disc %</th>'
+    + '</tr></thead>'
+    + '<tbody>' + assetRows + '</tbody>'
+    + '</table>'
+    + '<table style="' + tableStyle + '">'
+    + '<thead><tr>'
+    + '<th style="' + thStyle + '">User Band</th>'
+    + '<th style="' + thStyle + '">Admin List</th>'
+    + '<th style="' + thStyle + '">Admin Net</th>'
+    + '<th style="' + thStyle + '">Disc %</th>'
+    + '<th style="' + thStyle + '">Member List</th>'
+    + '<th style="' + thStyle + '">Member Net</th>'
+    + '<th style="' + thStyle + '">Disc %</th>'
+    + '</tr></thead>'
+    + '<tbody>' + userRows + '</tbody>'
+    + '</table>';
+}
+
+// Generate overage table HTML for Order Form (draft + final)
+function getOverageOFHtml() {
+  if(!state.includeOverage) return '';
+  var tier = state.platformTier;
+  if(!['Standard','Enterprise','Biz-Critical'].includes(tier)) return '';
+  var disc = parseFloat(state.overageDisc) || 0;
+  var assetBands = OVERAGE_ASSET_PRICES[tier] || OVERAGE_ASSET_PRICES['Enterprise'];
+  function netP(list) { return Math.round(list * (1 - disc/100)); }
+  function fmtP(n) { return '$' + n.toLocaleString(); }
+
+  var assetRows = assetBands.map(function(b) {
+    return '<tr><td style="padding:6px 10px;border:1px solid #ddd">' + b.label + '</td>'
+      + '<td style="padding:6px 10px;border:1px solid #ddd;text-align:right">' + fmtP(b.ppm) + '/M assets/yr</td>'
+      + '<td style="padding:6px 10px;border:1px solid #ddd;text-align:right;font-weight:700">' + fmtP(netP(b.ppm)) + '/M assets/yr</td></tr>';
+  }).join('');
+
+  var userRows = OVERAGE_USER_PRICES['Admin'].map(function(b, i) {
+    var aList = OVERAGE_USER_PRICES['Admin'][i].ppsm;
+    var mList = OVERAGE_USER_PRICES['Member'][i].ppsm;
+    return '<tr><td style="padding:6px 10px;border:1px solid #ddd">' + b.label + '</td>'
+      + '<td style="padding:6px 10px;border:1px solid #ddd;text-align:right">' + fmtP(aList) + '/seat/mo</td>'
+      + '<td style="padding:6px 10px;border:1px solid #ddd;text-align:right;font-weight:700">' + fmtP(netP(aList)) + '/seat/mo</td>'
+      + '<td style="padding:6px 10px;border:1px solid #ddd;text-align:right">' + fmtP(mList) + '/seat/mo</td>'
+      + '<td style="padding:6px 10px;border:1px solid #ddd;text-align:right;font-weight:700">' + fmtP(netP(mList)) + '/seat/mo</td></tr>';
+  }).join('');
+
+  var tblStyle = 'width:100%;border-collapse:collapse;font-size:12px;margin-bottom:20px';
+  var thStyle  = 'padding:7px 10px;background:#1B2F6E;color:#fff;font-size:11px;font-weight:700;text-align:left';
+
+  return '<div style="margin-top:24px;page-break-inside:avoid">'
+    + '<div style="font-size:13px;font-weight:700;color:#1B2F6E;margin-bottom:10px;border-bottom:2px solid #1B2F6E;padding-bottom:4px">Overage Pricing Schedule — ' + tier + (disc > 0 ? ' (' + disc.toFixed(1) + '% discount applied)' : '') + '</div>'
+    + '<div style="font-size:11px;color:#666;margin-bottom:8px">The following rates apply for usage beyond contracted limits. All overage is billed in arrears.</div>'
+    + '<div style="font-weight:700;font-size:11px;color:#333;margin-bottom:4px">Additional Assets</div>'
+    + '<table style="' + tblStyle + '">'
+    + '<thead><tr><th style="' + thStyle + '">Asset Band</th><th style="' + thStyle + '">List Price</th><th style="' + thStyle + '">Contracted Rate</th></tr></thead>'
+    + '<tbody>' + assetRows + '</tbody></table>'
+    + '<div style="font-weight:700;font-size:11px;color:#333;margin-bottom:4px">Additional Users</div>'
+    + '<table style="' + tblStyle + '">'
+    + '<thead><tr><th style="' + thStyle + '">Seat Band</th><th style="' + thStyle + '">Admin List</th><th style="' + thStyle + '">Admin Rate</th><th style="' + thStyle + '">Member List</th><th style="' + thStyle + '">Member Rate</th></tr></thead>'
+    + '<tbody>' + userRows + '</tbody></table>'
+    + '</div>';
+}
+
 function buildPane6(){
   el('pane6').innerHTML=`
     <div class="card" style="margin-bottom:0">

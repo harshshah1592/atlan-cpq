@@ -4718,6 +4718,62 @@ function toggleOptOut(){ const checked=el('f_optOut')?.checked;el('optOutDaysFie
   try{ pricingConfig=loadPricingConfig(); applyPricingConfig(pricingConfig); renderSidebarUser(); showView('dashboard'); }catch(e){ console.error('Init error:',e); }
   document.addEventListener('input', ()=>{ try{ navUpdate(); }catch(e){} });
   document.addEventListener('change', ()=>{ try{ navUpdate(); }catch(e){} });
+
+  // ── Read URL params from SFDC button (?oppId=...&dealType=NB|UP|RN) ──
+  // SFDC sends: https://harshshah1592.github.io/atlan-cpq/?oppId=006...&dealType=NB
+  (function handleUrlParams(){
+    try {
+      var params = new URLSearchParams(window.location.search);
+      var oppId    = params.get('oppId')    || params.get('sfdcOppId') || '';
+      var dt       = params.get('dealType') || params.get('type')      || '';
+      var legal    = params.get('legalName')|| params.get('legal')     || '';
+      var contact  = params.get('contact')  || '';
+      var email    = params.get('email')    || '';
+      var currency = params.get('currency') || '';
+
+      if(!oppId && !dt) return; // no params — normal load
+
+      // Clean the URL so it doesn't persist on refresh
+      history.replaceState(null, '', window.location.pathname);
+
+      // Validate dealType
+      var validTypes = ['NB','UP','RN'];
+      if(dt && !validTypes.includes(dt.toUpperCase())) dt = 'NB';
+      if(dt) dt = dt.toUpperCase();
+
+      // Pre-populate state with any passed params
+      if(oppId)    state.sfdcOppId  = oppId;
+      if(legal)    state.legal      = legal;
+      if(contact)  state.contact    = contact;
+      if(email)    state.email      = email;
+      if(currency) state.currency   = currency;
+
+      // Auto-open the deal type modal pre-filled, or go straight to CPQ if type is known
+      setTimeout(function(){
+        if(dt) {
+          // Go straight to CPQ with the deal type pre-set
+          openDealTypeModal();
+          // Pre-select the deal type and fill the opp ID after modal opens
+          setTimeout(function(){
+            var oppEl = el('f_sfdcOppId');
+            if(oppEl) {
+              oppEl.value = oppId;
+              oppEl.dispatchEvent(new Event('input'));
+            }
+            // Select the correct deal type
+            selectDealType(dt);
+          }, 200);
+        } else {
+          // Only oppId passed — open modal so rep can pick deal type
+          openDealTypeModal();
+          setTimeout(function(){
+            var oppEl = el('f_sfdcOppId');
+            if(oppEl) { oppEl.value = oppId; oppEl.dispatchEvent(new Event('input')); }
+          }, 200);
+        }
+      }, 400);
+    } catch(e) { console.warn('URL param handling error:', e); }
+  })();
 })();
 
 // ═══════════════════════════════════════════════════════════════════

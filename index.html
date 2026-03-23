@@ -463,14 +463,27 @@ textarea{resize:vertical;min-height:60px}
   <div class="sb-item" onclick="showView('contracts')" id="nav-contracts">
     <span class="sb-item-icon"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="2" width="12" height="10" rx="1.5" stroke="currentColor" stroke-width="1.4"/><path d="M4 5h6M4 7h4M4 9h5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg></span>Contracts
   </div>
+  <div class="sb-section">Integrations</div>
+  <div class="sb-item" onclick="showView('salesforce')" id="nav-salesforce">
+    <span class="sb-item-icon"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1.5C4 1.5 1.5 4 1.5 7S4 12.5 7 12.5 12.5 10 12.5 7 10 1.5 7 1.5z" stroke="currentColor" stroke-width="1.4"/><path d="M4.5 7c0-1.38 1.12-2.5 2.5-2.5s2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
+    Salesforce
+    <span id="sfdcStatusDot" style="width:7px;height:7px;border-radius:50%;background:#4A5568;margin-left:auto;flex-shrink:0;transition:background .3s"></span>
+  </div>
+
   <!-- Role Switcher (demo only) -->
   <div style="padding:10px 12px;border-top:1px solid rgba(255,255,255,.06)">
     <div style="font-size:9px;font-weight:700;color:rgba(255,255,255,.2);letter-spacing:1.2px;text-transform:uppercase;margin-bottom:6px">Demo: Switch Role</div>
     <div style="display:flex;flex-direction:column;gap:3px">
       <button onclick="switchRole('admin')" style="background:rgba(49,84,196,.2);border:1px solid rgba(49,84,196,.3);color:rgba(255,255,255,.7);border-radius:6px;padding:5px 8px;font-size:11px;font-weight:600;cursor:pointer;text-align:left;transition:all .15s" onmouseover="this.style.background='rgba(49,84,196,.4)'" onmouseout="this.style.background='rgba(49,84,196,.2)'">🛡️ Admin</button>
       <button onclick="switchRole('sales_manager')" style="background:rgba(0,184,122,.1);border:1px solid rgba(0,184,122,.2);color:rgba(255,255,255,.7);border-radius:6px;padding:5px 8px;font-size:11px;font-weight:600;cursor:pointer;text-align:left;transition:all .15s" onmouseover="this.style.background='rgba(0,184,122,.25)'" onmouseout="this.style.background='rgba(0,184,122,.1)'">👔 Sales Manager</button>
+      <button onclick="switchRole('sales_leadership')" style="background:rgba(123,47,190,.1);border:1px solid rgba(123,47,190,.2);color:rgba(255,255,255,.7);border-radius:6px;padding:5px 8px;font-size:11px;font-weight:600;cursor:pointer;text-align:left;transition:all .15s" onmouseover="this.style.background='rgba(123,47,190,.25)'" onmouseout="this.style.background='rgba(123,47,190,.1)'">⭐ Sales Leadership</button>
       <button onclick="switchRole('sales_rep')" style="background:rgba(232,155,0,.1);border:1px solid rgba(232,155,0,.2);color:rgba(255,255,255,.7);border-radius:6px;padding:5px 8px;font-size:11px;font-weight:600;cursor:pointer;text-align:left;transition:all .15s" onmouseover="this.style.background='rgba(232,155,0,.25)'" onmouseout="this.style.background='rgba(232,155,0,.1)'">💼 Sales Rep</button>
     </div>
+  </div>
+  <div style="padding:8px 12px;border-top:1px solid rgba(255,255,255,.06)">
+    <button onclick="seedTestQuotes()" style="width:100%;padding:7px 10px;border-radius:8px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.45);font-size:11px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:7px">
+      <span>🧪</span><span>Load Test Data</span>
+    </button>
   </div>
   <div id="sbFooter" class="sb-footer">
     <!-- filled by renderSidebarUser() -->
@@ -753,6 +766,93 @@ textarea{resize:vertical;min-height:60px}
     </div>
   </div>
 
+  <!-- ── SALESFORCE VIEW ─────────────────────────────── -->
+  <div class="view" id="view-salesforce">
+    <div class="dash-hero" style="background:linear-gradient(135deg,#0B1829 0%,#00A1E0 150%);min-height:auto;padding:20px 28px">
+      <div class="dash-hero-bg"></div>
+      <div style="position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+        <div>
+          <div style="font-size:20px;font-weight:700;color:#fff">Salesforce Integration</div>
+          <div style="font-size:12px;color:rgba(255,255,255,.5);margin-top:3px">OAuth 2.0 · Sandbox: atlanhq--harshtest · <span id="sfdcConnectedAs" style="color:rgba(255,255,255,.4)">Not connected</span></div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <div id="sfdcStatusBadge" style="padding:5px 14px;border-radius:20px;font-size:12px;font-weight:700;background:rgba(255,255,255,.1);color:rgba(255,255,255,.5)">● Disconnected</div>
+          <button onclick="sfdcConnect()" id="sfdcHeroConnectBtn" style="padding:7px 18px;border-radius:8px;background:#00A1E0;border:none;color:#fff;font-size:12px;font-weight:700;cursor:pointer">Connect to Salesforce</button>
+          <button id="sfdcDisconnectBtn" onclick="sfdcDisconnect()" class="hidden" style="padding:7px 14px;border-radius:8px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.6);font-size:12px;font-weight:600;cursor:pointer">Disconnect</button>
+        </div>
+      </div>
+    </div>
+    <div style="padding:20px 28px;display:flex;flex-direction:column;gap:16px">
+      <!-- Connection status card -->
+      <div id="sfdcConnectionCard" style="background:#fff;border:1px solid var(--border);border-radius:var(--r);padding:20px">
+        <div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:14px">Connection Status</div>
+        <div id="sfdcConnectionBody">
+          <div style="color:var(--faint);font-size:13px">Not connected. Enter your credentials below to connect.</div>
+        </div>
+        <!-- Login form — hidden when connected -->
+        <div id="sfdcLoginForm" style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div>
+            <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Username</div>
+            <input id="sfdcUsername" type="email" value="harsh.shah@atlan.com.harshtest"
+              style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:var(--font)"
+              placeholder="username@atlan.com.harshtest"/>
+          </div>
+          <div>
+            <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Password</div>
+            <input id="sfdcPassword" type="password"
+              style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:var(--font)"
+              placeholder="Your Salesforce password"
+              onkeydown="if(event.key==='Enter')sfdcConnect()"/>
+          </div>
+          <div>
+            <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Security Token <span style="font-weight:400;color:var(--faint)">(append to password if required)</span></div>
+            <input id="sfdcSecToken" type="text"
+              style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:var(--mono)"
+              placeholder="e.g. aBcXyZ123..."
+              onkeydown="if(event.key==='Enter')sfdcConnect()"/>
+          </div>
+          <div style="display:flex;align-items:flex-end">
+            <button onclick="sfdcConnect()" id="sfdcConnectBtn"
+              style="width:100%;padding:8px 16px;border-radius:8px;background:#00A1E0;border:none;color:#fff;font-size:12px;font-weight:700;cursor:pointer">
+              Connect to Salesforce
+            </button>
+          </div>
+          <div style="grid-column:1/-1;font-size:11px;color:var(--faint);padding:8px 10px;background:#F8FAFC;border-radius:6px;border:1px solid var(--border)">
+            💡 Password + Security Token: enter your password in the Password field and your security token separately above — the tool combines them automatically.
+            Get your security token: Sandbox → avatar → Settings → My Personal Information → Reset My Security Token
+          </div>
+        </div>
+      </div>
+      <!-- Manual push card -->
+      <div style="background:#fff;border:1px solid var(--border);border-radius:var(--r);padding:20px">
+        <div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:14px">Manual Push</div>
+        <div style="font-size:13px;color:var(--muted);margin-bottom:12px">Push the currently open quote to Salesforce. Opens the quote first if needed.</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button onclick="sfdcPushCurrentQuote()" style="padding:7px 16px;border-radius:8px;background:var(--blue);border:none;color:#fff;font-size:12px;font-weight:700;cursor:pointer">↑ Push Current Quote</button>
+          <button onclick="sfdcTestConnection()" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:#fff;font-size:12px;font-weight:600;cursor:pointer;color:var(--muted)">⚡ Test Connection</button>
+        </div>
+        <div id="sfdcPushLog" style="margin-top:12px;font-size:11px;color:var(--faint);font-family:var(--mono);max-height:120px;overflow-y:auto;background:#F8FAFC;border-radius:6px;padding:8px 10px;display:none"></div>
+      </div>
+      <!-- Pending queue card -->
+      <div style="background:#fff;border:1px solid var(--border);border-radius:var(--r);padding:20px">
+        <div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:14px">Pending SFDC Writes</div>
+        <div id="sfdcPendingQueue" style="font-size:13px;color:var(--faint)">No pending writes.</div>
+      </div>
+      <!-- Field mapping reference -->
+      <div style="background:#fff;border:1px solid var(--border);border-radius:var(--r);padding:20px">
+        <div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:14px">Field Mapping — Quote__c</div>
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead><tr style="border-bottom:2px solid var(--border)">
+            <th style="text-align:left;padding:6px 10px;color:var(--muted);font-weight:700">CPQ Field</th>
+            <th style="text-align:left;padding:6px 10px;color:var(--muted);font-weight:700">Salesforce API Field</th>
+            <th style="text-align:left;padding:6px 10px;color:var(--muted);font-weight:700">Type</th>
+          </tr></thead>
+          <tbody id="sfdcFieldMapBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <!-- ── CONTRACTS VIEW ──────────────────────────────── -->
   <div class="view" id="view-contracts">
     <!-- Hero banner -->
@@ -969,6 +1069,7 @@ const ROLES = {
     canViewAllDeals: true,
     canViewTeamDeals: true,
     canViewApprovalQueue: true,
+    canOverrideApprover: true,
     description: 'Full access to all deals, settings, and approval configuration'
   },
   sales_manager: {
@@ -984,7 +1085,24 @@ const ROLES = {
     canViewAllDeals: false,
     canViewTeamDeals: true,
     canViewApprovalQueue: true,
+    canOverrideApprover: false,
     description: 'View team deals and approvals. Cannot modify approval matrix.'
+  },
+  sales_leadership: {
+    label: 'Sales Leadership',
+    color: '#7B2FBE',
+    canViewPricingAdmin: false,
+    bg: 'rgba(123,47,190,.15)',
+    icon: '⭐',
+    visibility: 'All Deals',
+    canCreateDeal: false,
+    canViewApprovalMatrix: true,
+    canEditApprovalMatrix: false,
+    canViewAllDeals: true,
+    canViewTeamDeals: true,
+    canViewApprovalQueue: true,
+    canOverrideApprover: false,
+    description: 'VP NAM / CRO / CEO — view all deals, approve or reject. Cannot override approver routing.'
   },
   sales_rep: {
     label: 'Sales Rep',
@@ -999,6 +1117,7 @@ const ROLES = {
     canViewAllDeals: false,
     canViewTeamDeals: false,
     canViewApprovalQueue: false,
+    canOverrideApprover: false,
     description: 'Create and view own deals only. No access to approval configuration.'
   }
 };
@@ -1903,6 +2022,8 @@ function freshState(){
     quoteStatus:'Draft',
     sfdcOppId:'',
     parentContractId:'',
+    approverOverride: null,   // {name, email, reason, overriddenBy, overrideAt, fromName, fromEmail}
+    approverOverrideLog: [],  // full audit trail of all overrides
     quoteAcceptedAt:null,
     contractId:'',
     status:'Draft',
@@ -1954,7 +2075,8 @@ function showView(name){
     'approval-matrix':['Approval Matrix','Edit discount thresholds — changes apply immediately'],
     'pricing-admin':['Pricing Configuration','Admin only · Edit master pricing · Changes apply to all new quotes'],
     'contracts':['Customer Contracts','Live SKU ledger — active subscriptions per customer'],
-    'quotes':['Quotes','All quotes linked to SFDC Opportunities — accept to create a Contract']};
+    'quotes':['Quotes','All quotes linked to SFDC Opportunities — accept to create a Contract'],
+    'salesforce':['Salesforce Integration','OAuth 2.0 · Sandbox connection · Push quotes & approval records']};
   const t=titles[name]||['',''];
   el('topbarTitle').textContent=t[0]; el('topbarSub').textContent=t[1];
   if(name==='dashboard') renderDashboard();
@@ -1969,6 +2091,7 @@ function showView(name){
   }
   if(name==='contracts'){ renderContracts(); }
   if(name==='quotes'){ renderQuotes(); }
+  if(name==='salesforce'){ renderSfdcView(); }
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -3115,25 +3238,79 @@ function renderApprovalStep(){
   });
   if(el('flowBar'))el('flowBar').innerHTML=flowHtml;
 
-  // Single approver row
+  // ── Approver row with override capability ───────────────────────
   let rowsHtml='';
   if(highestApprover){
-    const ap=state.approvals['highest']||{};
-    rowsHtml=`<div class="appr-row">
-      <div style="flex:1">
-        <div style="font-size:12px;font-weight:600">${highestApprover.label}</div>
-        <div style="font-size:10px;color:var(--faint)">${highestApprover.approver}</div>
-      </div>
-      <input class="appr-email" placeholder="Approver email" value="${ap.email||''}" oninput="setApproval('highest','email',this.value)"/>
-      <div class="appr-btns">
-        <button class="btn-appr btn-ok" onclick="setApproval('highest','status','approved')">Approve</button>
-        <button class="btn-appr btn-rej" onclick="setApproval('highest','status','rejected')">Reject</button>
-        <button class="btn-appr btn-pend" onclick="setApproval('highest','status','pending')">Pending</button>
-      </div>
-      ${ap.status?badge(ap.status,ap.status==='approved'?'#16A34A':ap.status==='rejected'?'#D63B3B':'#B45309'):''}
-    </div>`;
+    const ap = state.approvals['highest']||{};
+    const ov = state.approverOverride||null;
+    const canOverride = canAccess('canOverrideApprover');
+    const isOverridden = !!ov;
+    const overrideBadge = isOverridden
+      ? '<span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:8px;background:#F5F3FF;border:1px solid #C4B5FD;color:#6B4FA8;margin-left:6px">\u26a1 Overridden</span>'
+      : '';
+    // Override audit trail
+    const log = state.approverOverrideLog||[];
+    let logHtml = '';
+    if(log.length){
+      logHtml = '<div style="margin-top:10px;padding:10px;background:#F8FAFC;border:1px solid var(--border);border-radius:var(--rs)">'
+        +'<div style="font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">Override audit trail</div>'
+        +log.map(function(e){
+          return '<div style="display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-bottom:1px solid var(--border)">'
+            +'<div style="width:6px;height:6px;border-radius:50%;background:#6B4FA8;flex-shrink:0;margin-top:4px"></div>'
+            +'<div style="flex:1;font-size:11px">'
+            +'<span style="font-weight:600">'+escHtml(e.overriddenBy)+'</span> changed approver'
+            +' from <span style="color:var(--muted)">'+escHtml(e.fromName)+'</span>'
+            +' \u2192 <span style="font-weight:600;color:#6B4FA8">'+escHtml(e.toName)+'</span>'
+            +' <span style="color:var(--faint)">('+escHtml(e.toEmail)+')</span><br>'
+            +'<span style="color:var(--faint)">Reason: '+escHtml(e.reason)+'</span><br>'
+            +'<span style="color:var(--faint)">'+new Date(e.overrideAt).toLocaleString()+'</span>'
+            +'</div></div>';
+        }).join('')
+        +'</div>';
+    }
+    // Override panel (RevOps only)
+    const ovName  = ov ? escHtml(ov.name)  : '';
+    const ovEmail = ov ? escHtml(ov.email) : '';
+    const ovReason= ov ? escHtml(ov.reason): '';
+    const overridePanel = canOverride
+      ? '<div id="apprOverridePanel" class="hidden" style="margin-top:10px;padding:12px;background:#F5F3FF;border:1.5px solid #C4B5FD;border-radius:var(--rs)">'
+          +'<div style="font-size:11px;font-weight:700;color:#6B4FA8;margin-bottom:8px">\u26a1 Override Approver <span style="font-size:9px;font-weight:400;color:#9CA3AF;margin-left:4px">Admin / RevOps only</span></div>'
+          +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">'
+            +'<div><div style="font-size:10px;color:var(--faint);margin-bottom:3px">New approver name</div>'
+            +'<input id="ovName" class="appr-email" style="width:100%" placeholder="e.g. PK (CEO)" value="'+ovName+'"/></div>'
+            +'<div><div style="font-size:10px;color:var(--faint);margin-bottom:3px">New approver email</div>'
+            +'<input id="ovEmail" class="appr-email" style="width:100%" placeholder="pk@atlan.com" value="'+ovEmail+'"/></div>'
+          +'</div>'
+          +'<div style="margin-bottom:8px"><div style="font-size:10px;color:var(--faint);margin-bottom:3px">Reason for override <span style="color:#D63B3B">*</span></div>'
+          +'<input id="ovReason" class="appr-email" style="width:100%" placeholder="e.g. Jim OOO — escalating to PK" value="'+ovReason+'"/></div>'
+          +'<div style="display:flex;gap:6px">'
+          +'<button onclick="applyApproverOverride()" style="padding:6px 14px;border-radius:6px;background:#6B4FA8;border:none;color:#fff;font-size:11px;font-weight:700;cursor:pointer">\u26a1 Apply Override</button>'
+          +(isOverridden?'<button onclick="clearApproverOverride()" style="padding:6px 12px;border-radius:6px;background:#FEF2F2;border:1px solid #FECACA;color:#D63B3B;font-size:11px;font-weight:600;cursor:pointer">\u2715 Clear Override</button>':'')
+          +'<button onclick="el(\'apprOverridePanel\').classList.add(\'hidden\')" style="padding:6px 12px;border-radius:6px;border:1px solid var(--border);background:#fff;font-size:11px;font-weight:600;cursor:pointer;color:var(--muted)">Cancel</button>'
+          +'</div></div>'
+      : '';
+    rowsHtml = '<div class="appr-row" style="flex-wrap:wrap;gap:8px">'
+      +'<div style="flex:1;min-width:180px">'
+        +'<div style="display:flex;align-items:center;gap:4px">'
+          +'<div style="font-size:12px;font-weight:600">'+(isOverridden?escHtml(ov.name):highestApprover.label)+'</div>'
+          +overrideBadge
+        +'</div>'
+        +'<div style="font-size:10px;color:var(--faint)">'+(isOverridden?escHtml(ov.email):highestApprover.approver)+'</div>'
+        +(isOverridden?'<div style="font-size:10px;color:#6B4FA8;margin-top:2px">Reason: '+escHtml(ov.reason)+'</div>':'')
+      +'</div>'
+      +'<input class="appr-email" placeholder="Approver email" value="'+(isOverridden?escHtml(ov.email):(ap.email||''))+'" oninput="setApproval(\'highest\',\'email\',this.value)" '+(isOverridden?'style="border-color:#C4B5FD"':'')+'/>'
+      +'<div class="appr-btns">'
+        +'<button class="btn-appr btn-ok" onclick="setApproval(\'highest\',\'status\',\'approved\')">Approve</button>'
+        +'<button class="btn-appr btn-rej" onclick="setApproval(\'highest\',\'status\',\'rejected\')">Reject</button>'
+        +'<button class="btn-appr btn-pend" onclick="setApproval(\'highest\',\'status\',\'pending\')">Pending</button>'
+      +'</div>'
+      +(ap.status?badge(ap.status,ap.status==='approved'?'#16A34A':ap.status==='rejected'?'#D63B3B':'#B45309'):'')
+      +(canOverride?'<button onclick="el(\'apprOverridePanel\').classList.toggle(\'hidden\')" style="padding:5px 10px;border-radius:6px;background:#F5F3FF;border:1px solid #C4B5FD;color:#6B4FA8;font-size:10px;font-weight:700;cursor:pointer;margin-left:auto">\u26a1 Override Approver</button>':'')
+    +'</div>'
+    +overridePanel
+    +logHtml;
   } else {
-    rowsHtml='<div style="color:var(--green);font-size:12px;padding:10px;font-weight:600">✓ Self-approval range (≤15%). No additional sign-off needed.</div>';
+    rowsHtml='<div style="color:var(--green);font-size:12px;padding:10px;font-weight:600">\u2713 Self-approval range (\u226415%). No additional sign-off needed.</div>';
   }
 
   // Non-standard terms section with per-item approval rows
@@ -3185,7 +3362,27 @@ function renderApprovalStep(){
 
   if(el('approvalRows'))el('approvalRows').innerHTML=rowsHtml+nstHtml;
 }
-function setApproval(key,field,val){if(!state.approvals[key])state.approvals[key]={status:'',email:''};state.approvals[key][field]=val;renderApprovalStep();}
+function setApproval(key,field,val){
+  if(!state.approvals[key])state.approvals[key]={status:'',email:''};
+  state.approvals[key][field]=val;
+  // Write timestamps when status changes
+  var now = new Date().toISOString();
+  if(field==='status') {
+    if(val==='approved') { state.approvedBy=state.approvals[key].email||SESSION_USER.name; state.approvedAt=now; state.lastStatusChange=now; }
+    if(val==='rejected') { state.rejectedBy=state.approvals[key].email||SESSION_USER.name; state.rejectedAt=now; state.lastStatusChange=now; }
+    // SFDC approval writeback
+    if(val==='approved'||val==='rejected') {
+      sfdcWriteApprovalRecord(state.dealId, {
+        status: val,
+        name:   state.approvals[key].email||'',
+        email:  state.approvals[key].email||'',
+        approvedAt: val==='approved'?now:null,
+        rejectedAt: val==='rejected'?now:null,
+      });
+    }
+  }
+  renderApprovalStep();
+}
 function toggleNonStd(key,checked){
   if(!state.nonStdManual)state.nonStdManual=[];
   if(checked&&!state.nonStdManual.includes(key))state.nonStdManual.push(key);
@@ -3604,6 +3801,8 @@ function saveDeal(){
     acceptedBy: state.acceptedBy||null,
     acceptedAt: state.acceptedAt||null,
     lastStatusChange: state.lastStatusChange||null,
+    approverOverride: state.approverOverride||null,
+    approverOverrideLog: state.approverOverrideLog||[],
   };
   const idx=deals.findIndex(d=>d.dealId===snap.dealId);
   if(idx>=0) deals[idx]=snap; else deals.unshift(snap);
@@ -5529,7 +5728,9 @@ function openQuoteDetail(dealId) {
       state.rejectedAt     = d.rejectedAt     || null;
       state.acceptedBy     = d.acceptedBy     || null;
       state.acceptedAt     = d.acceptedAt     || null;
-      state.lastStatusChange = d.lastStatusChange || null;
+      state.lastStatusChange   = d.lastStatusChange   || null;
+      state.approverOverride    = d.approverOverride   || null;
+      state.approverOverrideLog = d.approverOverrideLog|| [];
       updateOFButtons();
     }
   }, 300);
@@ -5559,6 +5760,818 @@ buildPane8 = function() {
     actionsEl.parentNode.insertBefore(statusBar, actionsEl);
   }
 };
+
+// ═══════════════════════════════════════════════════════════════════
+// APPROVER OVERRIDE — RevOps only
+// ═══════════════════════════════════════════════════════════════════
+function applyApproverOverride() {
+  if(!canAccess('canOverrideApprover')) {
+    alert('Only Admin / RevOps can override approvers.'); return;
+  }
+  var newName   = (el('ovName')?.value||'').trim();
+  var newEmail  = (el('ovEmail')?.value||'').trim();
+  var reason    = (el('ovReason')?.value||'').trim();
+  if(!newName)  { alert('Please enter the new approver name.');  return; }
+  if(!newEmail) { alert('Please enter the new approver email.'); return; }
+  if(!reason)   { alert('A reason is required for audit purposes.'); return; }
+
+  // Capture from-state before overwriting
+  var ov = state.approverOverride;
+  var fromName  = ov ? ov.name  : (function(){ var ha=getHighestApprover(getTotals().disc); return ha?ha.approver:'(matrix default)'; })();
+  var fromEmail = ov ? ov.email : (state.approvals['highest']?.email||'');
+
+  var now = new Date().toISOString();
+
+  // Build log entry
+  var logEntry = {
+    overriddenBy: SESSION_USER.name,
+    fromName:  fromName,
+    fromEmail: fromEmail,
+    toName:    newName,
+    toEmail:   newEmail,
+    reason:    reason,
+    overrideAt: now,
+  };
+
+  // Apply override to state
+  if(!state.approverOverrideLog) state.approverOverrideLog = [];
+  state.approverOverrideLog.push(logEntry);
+  state.approverOverride = { name: newName, email: newEmail, reason: reason,
+    overriddenBy: SESSION_USER.name, overrideAt: now,
+    fromName: fromName, fromEmail: fromEmail };
+
+  // Update the email field in approvals to match new approver
+  if(!state.approvals['highest']) state.approvals['highest'] = {};
+  state.approvals['highest'].email = newEmail;
+
+  // ── Clear existing approval — reset to Pending Approval ──────────
+  var hadApproval = state.approvals['highest'].status === 'approved';
+  state.approvals['highest'].status = '';
+  if(hadApproval) {
+    state.quoteStatus = 'Pending Approval';
+    state.lastStatusChange = now;
+    var idx = deals.findIndex(function(d){ return d.dealId===state.dealId; });
+    if(idx>=0) {
+      deals[idx].quoteStatus = 'Pending Approval';
+      deals[idx].status = 'Pending Approval';
+      deals[idx].lastStatusChange = now;
+      deals[idx].approverOverride = state.approverOverride;
+      deals[idx].approverOverrideLog = state.approverOverrideLog;
+    }
+  }
+
+  // Persist
+  saveDeal();
+
+  // ── SFDC writeback ────────────────────────────────────────────────
+  sfdcPushOverride(logEntry);
+
+  el('apprOverridePanel')?.classList.add('hidden');
+  renderApprovalStep();
+  if(hadApproval) { updateOFButtons(); renderDashboard(); }
+  console.log('[CPQ] Approver overridden:', logEntry);
+}
+
+function clearApproverOverride() {
+  if(!canAccess('canOverrideApprover')) return;
+  if(!confirm('Clear the approver override? The matrix default will be restored.')) return;
+  state.approverOverride = null;
+  saveDeal();
+  el('apprOverridePanel')?.classList.add('hidden');
+  renderApprovalStep();
+}
+
+// ── SFDC writeback for approver override ─────────────────────────
+// Writes to Quote__c custom fields:
+//   Approver_Override_Name__c, Approver_Override_Email__c,
+//   Approver_Override_Reason__c, Approver_Overridden_By__c,
+//   Approver_Override_At__c
+// These should be created as custom fields on the Quote__c object in SFDC.
+function sfdcPushOverride(logEntry) {
+  // Attempt SFDC push if connected — fails gracefully if not
+  var payload = {
+    Approver_Override_Name__c:   logEntry.toName,
+    Approver_Override_Email__c:  logEntry.toEmail,
+    Approver_Override_Reason__c: logEntry.reason,
+    Approver_Overridden_By__c:   logEntry.overriddenBy,
+    Approver_Override_At__c:     logEntry.overrideAt,
+    Approver_Previous_Name__c:   logEntry.fromName,
+  };
+  // Store in deal for SFDC sync panel to pick up on next manual push
+  var idx = deals.findIndex(function(d){ return d.dealId===state.dealId; });
+  if(idx>=0) {
+    deals[idx].pendingSfdcOverrideFields = payload;
+    saveDeals(deals);
+  }
+  // If SFDC is already connected, push immediately via existing sfdcApiCall pattern
+  var token = sessionStorage.getItem('sfdc_access_token');
+  var inst  = sessionStorage.getItem('sfdc_instance_url');
+  if(!token || !inst || !state.sfdcQuoteRecordId) {
+    console.log('[CPQ] SFDC not connected or no Quote record — override fields queued for next push:', payload);
+    return;
+  }
+  var recId = state.sfdcQuoteRecordId;
+  fetch(inst+'/services/data/v58.0/sobjects/Quote__c/'+recId, {
+    method:'PATCH',
+    headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+    body: JSON.stringify(payload)
+  }).then(function(r){
+    if(r.ok) console.log('[CPQ] SFDC override fields written OK');
+    else r.text().then(function(t){ console.warn('[CPQ] SFDC override write failed:', t); });
+  }).catch(function(e){ console.warn('[CPQ] SFDC override write error:', e); });
+}
+
+
+
+// ═══════════════════════════════════════════════════════════════════
+// SALESFORCE OAUTH 2.0 + REST API INTEGRATION
+// Implicit flow — no backend needed for GitHub Pages
+// Sandbox: atlanhq--harshtest.sandbox.my.salesforce.com
+// Production: update SFDC_INSTANCE_URL when going live
+// ═══════════════════════════════════════════════════════════════════
+
+const SFDC_CONFIG = {
+  clientId:     '3MVG9j6uMOMC1DNgb228MoMe2Ff0et2sF5HA2QfigqPWMnqGRRIDXycv2JEwoX_Yf7J_XAy5lvMNa2CTHQ64Z',
+  clientSecret: 'B6314E7749DF1C8DA91FD62EBFB5BE04CD8953C840F669BB4A76DDB744A18CA8',
+  instanceUrl:  'https://atlanhq--harshtest.sandbox.my.salesforce.com',
+  loginUrl:     'https://test.salesforce.com',  // sandbox — change to login.salesforce.com for prod
+  callbackUrl:  'https://harshshah1592.github.io/atlan-cpq/',
+  apiVersion:   'v59.0',
+  defaultUser:  'harsh.shah@atlan.com.harshtest',
+};
+
+// SFDC field mapping — CPQ field → Quote__c API name
+const SFDC_FIELD_MAP = [
+  { cpq: 'legal',        sfdc: 'Legal_Name__c',            type: 'Text' },
+  { cpq: 'sfdcOppId',    sfdc: 'SFDC_Opp_ID__c',           type: 'Text (External ID)' },
+  { cpq: 'dealId',       sfdc: 'GitHub_Quote_ID__c',        type: 'Text (External ID)' },
+  { cpq: 'totalNet',     sfdc: 'Net_ARR__c',                type: 'Currency' },
+  { cpq: 'totalList',    sfdc: 'List_ARR__c',               type: 'Currency' },
+  { cpq: 'disc',         sfdc: 'Discount_Pct__c',           type: 'Percent' },
+  { cpq: 'quoteStatus',  sfdc: 'Quote_Status__c',           type: 'Picklist' },
+  { cpq: 'platformTier', sfdc: 'Platform_Tier__c',          type: 'Text' },
+  { cpq: 'repName',      sfdc: 'Rep_Name__c',               type: 'Text' },
+  { cpq: 'startDate',    sfdc: 'Start_Date__c',             type: 'Date' },
+  { cpq: 'termMonths',   sfdc: 'Term_Months__c',            type: 'Number' },
+  { cpq: 'discReason',   sfdc: 'Discount_Reason__c',        type: 'Text' },
+  { cpq: 'isAMAP',       sfdc: 'Is_AMAP__c',               type: 'Checkbox' },
+  // Approver override fields
+  { cpq: 'approverOverride.name',  sfdc: 'Approver_Override_Name__c',  type: 'Text' },
+  { cpq: 'approverOverride.email', sfdc: 'Approver_Override_Email__c', type: 'Email' },
+];
+
+// ── Token storage ────────────────────────────────────────────────
+function sfdcGetToken()    { return sessionStorage.getItem('sfdc_access_token'); }
+function sfdcGetInstance() { return sessionStorage.getItem('sfdc_instance_url') || SFDC_CONFIG.instanceUrl; }
+function sfdcIsConnected() { return !!sfdcGetToken(); }
+
+function sfdcStoreToken(token, instanceUrl, userInfo) {
+  sessionStorage.setItem('sfdc_access_token', token);
+  sessionStorage.setItem('sfdc_instance_url', instanceUrl || SFDC_CONFIG.instanceUrl);
+  if(userInfo) sessionStorage.setItem('sfdc_user_info', JSON.stringify(userInfo));
+  sfdcUpdateUI();
+}
+
+function sfdcDisconnect() {
+  sessionStorage.removeItem('sfdc_access_token');
+  sessionStorage.removeItem('sfdc_instance_url');
+  sessionStorage.removeItem('sfdc_user_info');
+  sfdcUpdateUI();
+  if(currentView === 'salesforce') renderSfdcView();
+}
+
+// ── Username-Password OAuth Flow (sandbox) ──────────────────────
+// Uses Resource Owner Password Credentials grant.
+// Works for sandbox with direct username+password login (no SSO/2FA).
+// For production with Jumpcloud, replace with Authorization Code + PKCE via a token proxy.
+function sfdcConnect() {
+  var username = (el('sfdcUsername')||{value:''}).value.trim() || 'harsh.shah@atlan.com.harshtest';
+  var password = (el('sfdcPassword')||{value:''}).value;
+  var token    = (el('sfdcSecToken')||{value:''}).value.trim();
+  if(!password) { sfdcLog('Please enter your Salesforce password.'); return; }
+
+  sfdcLog('Connecting to Salesforce...');
+  var connectBtn = el('sfdcConnectBtn');
+  if(connectBtn) { connectBtn.disabled = true; connectBtn.textContent = 'Connecting...'; }
+
+  // Username-Password grant via SFDC token endpoint
+  // CORS for OAuth endpoints must be enabled in SFDC Setup
+  var body = new URLSearchParams({
+    grant_type:    'password',
+    client_id:     SFDC_CONFIG.clientId,
+    client_secret: SFDC_CONFIG.clientSecret,
+    username:      username,
+    password:      password + token,  // password + security token concatenated
+  });
+
+  fetch(SFDC_CONFIG.loginUrl + '/services/oauth2/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body.toString(),
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(data) {
+    if(connectBtn) { connectBtn.disabled = false; connectBtn.textContent = 'Connect to Salesforce'; }
+    if(data.error) {
+      sfdcLog('✗ ' + data.error + ': ' + (data.error_description||''));
+      var errMsg = data.error === 'invalid_grant'
+        ? 'Login failed — check your password and security token.\n\nPassword + security token should be entered with no space between them.'
+        : data.error_description || data.error;
+      alert('Salesforce connection failed:\n' + errMsg);
+      return;
+    }
+    var instanceUrl = data.instance_url || SFDC_CONFIG.instanceUrl;
+    // Fetch user info
+    fetch(instanceUrl + '/services/oauth2/userinfo', {
+      headers: { 'Authorization': 'Bearer ' + data.access_token }
+    }).then(function(r2){ return r2.json(); })
+      .then(function(user) {
+        sfdcStoreToken(data.access_token, instanceUrl, user);
+        sfdcLog('✓ Connected as ' + (user.name||user.display_name||username));
+        // Clear password from DOM
+        if(el('sfdcPassword')) el('sfdcPassword').value = '';
+        if(el('sfdcSecToken')) el('sfdcSecToken').value = '';
+        if(currentView === 'salesforce') renderSfdcView();
+        else {
+          var toast = document.createElement('div');
+          toast.style.cssText = 'position:fixed;bottom:24px;right:24px;background:#00B87A;color:#fff;padding:12px 18px;border-radius:10px;font-size:13px;font-weight:600;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.15)';
+          toast.textContent = '✓ Connected to Salesforce as ' + (user.name||user.display_name||username);
+          document.body.appendChild(toast);
+          setTimeout(function(){ toast.remove(); }, 4000);
+        }
+      })
+      .catch(function() {
+        // userinfo failed but token works — store anyway
+        sfdcStoreToken(data.access_token, instanceUrl, {name: username, email: username});
+        sfdcLog('✓ Connected (user info unavailable)');
+        if(el('sfdcPassword')) el('sfdcPassword').value = '';
+        if(currentView === 'salesforce') renderSfdcView();
+      });
+  })
+  .catch(function(e) {
+    if(connectBtn) { connectBtn.disabled = false; connectBtn.textContent = 'Connect to Salesforce'; }
+    sfdcLog('✗ Connection error: ' + e.message);
+    if(e.message.toLowerCase().includes('cors') || e.message.toLowerCase().includes('failed to fetch')) {
+      alert('CORS error — make sure "Enable CORS for OAuth endpoints" is checked in SFDC Setup → CORS, and the origin https://harshshah1592.github.io is in the allowed list.');
+    } else {
+      alert('Connection error: ' + e.message);
+    }
+  });
+}
+
+// Keep sfdcStartOAuth as alias so the connect button works
+function sfdcStartOAuth() { sfdcConnect(); }
+
+
+
+// ── Core API wrapper ─────────────────────────────────────────────
+function sfdcApiCall(method, path, body, retried) {
+  var token    = sfdcGetToken();
+  var instance = sfdcGetInstance();
+  if(!token) return Promise.reject(new Error('Not connected to Salesforce'));
+  var opts = {
+    method: method,
+    headers: {
+      'Authorization': 'Bearer ' + token,
+      'Content-Type':  'application/json',
+    },
+  };
+  if(body && method !== 'GET') opts.body = JSON.stringify(body);
+  var url = instance + '/services/data/' + SFDC_CONFIG.apiVersion + path;
+  return fetch(url, opts).then(function(r) {
+    if(r.status === 401 && !retried) {
+      // Token expired — disconnect and prompt reconnect
+      sfdcLog('Session expired. Please reconnect to Salesforce.');
+      sfdcDisconnect();
+      return Promise.reject(new Error('Session expired'));
+    }
+    if(r.status === 204) return { ok: true }; // PATCH success — no body
+    return r.json().then(function(data) {
+      if(!r.ok) return Promise.reject(new Error(JSON.stringify(data)));
+      return data;
+    });
+  });
+}
+
+// ── Test connection ──────────────────────────────────────────────
+function sfdcTestConnection() {
+  if(!sfdcIsConnected()) { alert('Not connected. Click Connect to Salesforce first.'); return; }
+  sfdcLog('Testing connection...');
+  sfdcApiCall('GET', '/limits')
+    .then(function(data) {
+      var calls = data.DailyApiRequests;
+      sfdcLog('✓ Connection OK. API calls: ' + calls.Remaining + ' remaining of ' + calls.Max + ' daily.');
+    })
+    .catch(function(e) { sfdcLog('✗ Test failed: ' + e.message); });
+}
+
+// ── Push quote to SFDC ───────────────────────────────────────────
+function sfdcPushCurrentQuote() {
+  if(!sfdcIsConnected()) {
+    alert('Not connected to Salesforce. Go to the Salesforce tab and connect first.');
+    return;
+  }
+  var snap = saveDeal();
+  if(!snap.sfdcOppId) {
+    alert('This quote has no SFDC Opportunity ID. Add one in Step 1 of the deal first.');
+    return;
+  }
+  sfdcLog('Pushing quote ' + snap.dealId + ' to SFDC...');
+  // Build payload
+  var payload = {
+    Legal_Name__c:      snap.legal || '',
+    SFDC_Opp_ID__c:     snap.sfdcOppId || '',
+    GitHub_Quote_ID__c: snap.dealId || '',
+    Net_ARR__c:         snap.totalNet || 0,
+    List_ARR__c:        snap.totalList || 0,
+    Discount_Pct__c:    snap.disc || 0,
+    Quote_Status__c:    snap.quoteStatus || 'Draft',
+    Platform_Tier__c:   snap.platformTier || '',
+    Rep_Name__c:        snap.repName || '',
+    Start_Date__c:      snap.startDate || null,
+    Term_Months__c:     parseInt(snap.termMonths) || 12,
+    Discount_Reason__c: snap.discReason || '',
+    Is_AMAP__c:         !!snap.isAMAP,
+  };
+  // Add override fields if present
+  if(snap.approverOverride) {
+    payload.Approver_Override_Name__c  = snap.approverOverride.name  || '';
+    payload.Approver_Override_Email__c = snap.approverOverride.email || '';
+  }
+  // Upsert on GitHub_Quote_ID__c external ID
+  sfdcApiCall('PATCH',
+    '/sobjects/Quote__c/GitHub_Quote_ID__c/' + encodeURIComponent(snap.dealId),
+    payload
+  ).then(function(r) {
+    sfdcLog('✓ Quote ' + snap.dealId + ' pushed to SFDC successfully.');
+    // Store SFDC record ID if returned
+    if(r && r.id) {
+      state.sfdcQuoteRecordId = r.id;
+      var idx = deals.findIndex(function(d){ return d.dealId===snap.dealId; });
+      if(idx>=0) { deals[idx].sfdcQuoteRecordId = r.id; saveDeals(deals); }
+    }
+    // Clear pending override fields
+    var idx2 = deals.findIndex(function(d){ return d.dealId===snap.dealId; });
+    if(idx2>=0) { delete deals[idx2].pendingSfdcOverrideFields; saveDeals(deals); }
+    renderSfdcPendingQueue();
+  }).catch(function(e) {
+    sfdcLog('✗ Push failed: ' + e.message);
+  });
+}
+
+// ── Write approval record ────────────────────────────────────────
+function sfdcWriteApprovalRecord(dealId, approvalData) {
+  if(!sfdcIsConnected()) {
+    sfdcLog('SFDC not connected — approval queued locally.');
+    return;
+  }
+  var snap = deals.find(function(d){ return d.dealId===dealId; });
+  if(!snap) return;
+  var payload = {
+    GitHub_Quote_ID__c: dealId,
+    SFDC_Opp_ID__c:     snap.sfdcOppId || '',
+    Approval_Status__c: approvalData.status || '',
+    Approver_Name__c:   approvalData.name  || '',
+    Approver_Email__c:  approvalData.email || '',
+    Approved_At__c:     approvalData.approvedAt  || null,
+    Rejected_At__c:     approvalData.rejectedAt  || null,
+    Rejection_Reason__c:approvalData.rejectionReason || '',
+    Override_Name__c:   (snap.approverOverride && snap.approverOverride.name)  || '',
+    Override_Email__c:  (snap.approverOverride && snap.approverOverride.email) || '',
+  };
+  sfdcApiCall('PATCH',
+    '/sobjects/CPQ_Quote_Approval__c/GitHub_Quote_ID__c/' + encodeURIComponent(dealId),
+    payload
+  ).then(function() {
+    sfdcLog('✓ Approval record written for ' + dealId);
+  }).catch(function(e) {
+    sfdcLog('✗ Approval write failed: ' + e.message);
+  });
+}
+
+// ── UI helpers ───────────────────────────────────────────────────
+function sfdcLog(msg) {
+  var logEl = el('sfdcPushLog');
+  if(!logEl) { console.log('[SFDC]', msg); return; }
+  logEl.style.display = 'block';
+  var line = document.createElement('div');
+  line.textContent = new Date().toLocaleTimeString() + ' — ' + msg;
+  logEl.insertBefore(line, logEl.firstChild);
+}
+
+function sfdcUpdateUI() {
+  var connected = sfdcIsConnected();
+  // Sidebar dot
+  var dot = el('sfdcStatusDot');
+  if(dot) dot.style.background = connected ? '#00B87A' : '#4A5568';
+  // Topbar badge if in sfdc view
+  var badge = el('sfdcStatusBadge');
+  if(badge) {
+    badge.textContent  = connected ? '● Connected' : '● Disconnected';
+    badge.style.background = connected ? 'rgba(0,184,122,.2)' : 'rgba(255,255,255,.1)';
+    badge.style.color      = connected ? '#00B87A' : 'rgba(255,255,255,.5)';
+  }
+  var connectBtn     = el('sfdcConnectBtn');
+  var heroConnectBtn = el('sfdcHeroConnectBtn');
+  var disconnectBtn  = el('sfdcDisconnectBtn');
+  var loginForm      = el('sfdcLoginForm');
+  if(connectBtn)     connectBtn.style.display     = connected ? 'none' : '';
+  if(heroConnectBtn) heroConnectBtn.classList.toggle('hidden', connected);
+  if(disconnectBtn)  disconnectBtn.classList.toggle('hidden', !connected);
+  if(loginForm)      loginForm.style.display      = connected ? 'none' : 'grid';
+  // Connected-as label
+  var asEl = el('sfdcConnectedAs');
+  if(asEl) {
+    try {
+      var user = JSON.parse(sessionStorage.getItem('sfdc_user_info')||'{}');
+      asEl.textContent = connected ? ('Connected as ' + (user.name||user.email||'Unknown')) : 'Not connected';
+      asEl.style.color = connected ? '#4ADE80' : 'rgba(255,255,255,.4)';
+    } catch(e) {}
+  }
+}
+
+function renderSfdcView() {
+  sfdcUpdateUI();
+  // Connection body + login form visibility
+  var bodyEl = el('sfdcConnectionBody');
+  var loginForm = el('sfdcLoginForm');
+  if(sfdcIsConnected()) {
+    if(loginForm) loginForm.style.display = 'none';
+    if(bodyEl) {
+      try {
+        var user = JSON.parse(sessionStorage.getItem('sfdc_user_info')||'{}');
+        bodyEl.innerHTML = '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">'
+          + sfdcStatBox('Status',   '<span style="color:#00B87A;font-weight:700">● Connected</span>')
+          + sfdcStatBox('User',     escHtml(user.name||user.display_name||user.email||'—'))
+          + sfdcStatBox('Org',      'Sandbox')
+          + sfdcStatBox('Instance', escHtml(sfdcGetInstance().replace('https://','').replace('.sandbox.my.salesforce.com','').replace('.my.salesforce.com','')))
+          + sfdcStatBox('API',      SFDC_CONFIG.apiVersion)
+          + sfdcStatBox('Mode',     '<span style="color:#E89B00;font-weight:700">Sandbox</span>')
+          + '</div>';
+      } catch(e) {
+        bodyEl.innerHTML = '<div style="color:#00B87A;font-weight:600">● Connected</div>';
+      }
+    }
+  } else {
+    if(loginForm) loginForm.style.display = 'grid';
+    if(bodyEl) bodyEl.innerHTML = '<div style="color:var(--faint);font-size:13px">Not connected. Enter your credentials below to connect.</div>';
+  }
+  // Field map table
+  var mapEl = el('sfdcFieldMapBody');
+  if(mapEl) {
+    mapEl.innerHTML = SFDC_FIELD_MAP.map(function(f, i) {
+      var bg = i%2===0 ? '#fff' : '#F8FAFC';
+      return '<tr style="border-bottom:1px solid var(--border);background:'+bg+'">'
+        + '<td style="padding:7px 10px;font-family:var(--mono);font-size:11px;color:var(--text)">'+f.cpq+'</td>'
+        + '<td style="padding:7px 10px;font-family:var(--mono);font-size:11px;color:var(--blue)">'+f.sfdc+'</td>'
+        + '<td style="padding:7px 10px;font-size:11px;color:var(--faint)">'+f.type+'</td>'
+        + '</tr>';
+    }).join('');
+  }
+  renderSfdcPendingQueue();
+}
+
+function sfdcStatBox(label, val) {
+  return '<div style="padding:12px;background:#F8FAFC;border-radius:8px;border:1px solid var(--border)">'
+    + '<div style="font-size:10px;font-weight:600;color:var(--faint);margin-bottom:4px;text-transform:uppercase;letter-spacing:.4px">'+label+'</div>'
+    + '<div style="font-size:13px;font-weight:600;color:var(--text)">'+val+'</div>'
+    + '</div>';
+}
+
+function renderSfdcPendingQueue() {
+  var el2 = el('sfdcPendingQueue');
+  if(!el2) return;
+  var pending = deals.filter(function(d){ return d.pendingSfdcOverrideFields; });
+  if(!pending.length) { el2.innerHTML = '<div style="font-size:13px;color:var(--faint)">No pending writes.</div>'; return; }
+  el2.innerHTML = pending.map(function(d) {
+    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:#F8FAFC;border:1px solid var(--border);border-radius:6px;margin-bottom:6px">'
+      + '<div style="font-size:12px"><span style="font-family:var(--mono);font-weight:600">'+d.dealId+'</span> — '+escHtml(d.legal||'(no company)')+'<br>'
+      + '<span style="font-size:10px;color:var(--faint)">Approver override pending push</span></div>'
+      + '<button onclick="sfdcPushPendingOverride(&quot;'+d.dealId+'&quot;)" style="padding:4px 12px;border-radius:6px;background:var(--blue);border:none;color:#fff;font-size:11px;font-weight:700;cursor:pointer">Push Now</button>'
+      + '</div>';
+  }).join('');
+}
+
+function sfdcPushPendingOverride(dealId) {
+  var d = deals.find(function(x){ return x.dealId===dealId; });
+  if(!d || !d.pendingSfdcOverrideFields) return;
+  if(!sfdcIsConnected()) { alert('Not connected to Salesforce.'); return; }
+  var recId = d.sfdcQuoteRecordId;
+  var path  = recId
+    ? '/sobjects/Quote__c/' + recId
+    : '/sobjects/Quote__c/GitHub_Quote_ID__c/' + encodeURIComponent(dealId);
+  sfdcApiCall('PATCH', path, d.pendingSfdcOverrideFields)
+    .then(function() {
+      sfdcLog('✓ Override fields pushed for ' + dealId);
+      var idx = deals.findIndex(function(x){ return x.dealId===dealId; });
+      if(idx>=0) { delete deals[idx].pendingSfdcOverrideFields; saveDeals(deals); }
+      renderSfdcPendingQueue();
+    })
+    .catch(function(e){ sfdcLog('✗ Override push failed: ' + e.message); });
+}
+
+// Auto-update UI on load if already connected from previous session
+(function(){ setTimeout(sfdcUpdateUI, 100); })();
+
+// ═══════════════════════════════════════════════════════════════════
+// SEED TEST DATA — 10 representative quotes covering all scenarios
+// ═══════════════════════════════════════════════════════════════════
+function seedTestQuotes() {
+  var existing = loadDeals();
+  var SEED_FLAG = 'atlan_cpq_seeded_v1';
+  if(localStorage.getItem(SEED_FLAG)) {
+    if(!confirm('Test data has already been loaded. Load again? (duplicates will be added)')) return;
+  }
+
+  var now = new Date();
+  function daysAgo(n){ var d=new Date(now); d.setDate(d.getDate()-n); return d.toISOString(); }
+  function isoDate(d){ return d.toISOString().slice(0,10); }
+  function startDate(daysFromNow){ var d=new Date(now); d.setDate(d.getDate()+daysFromNow); return isoDate(d); }
+
+  var seeds = [
+    // 1. NB · Enterprise · 28% disc · Pending Approval (RSD required)
+    {
+      dealId:'ATL-1001', dealType:'NB', quoteStatus:'Pending Approval', status:'Pending Approval',
+      legal:'Snowflake Inc.', billing:'450 Concar Dr, San Mateo, CA 94402', contact:'Sarah Chen',
+      email:'sarah.chen@snowflake.com', entity:'Atlan Inc.', currency:'USD',
+      startDate:startDate(15), termMonths:12, payTerms:'Net 30', billFreq:'Annual',
+      repName:'Alex Rivera', repEmail:'alex.rivera@atlan.com',
+      platformTier:'Enterprise', assets:5000000,
+      platformList:170000, platformNet:122400, platformDisc:28,
+      users:[
+        {type:'Admin', qty:15, band:'1–100', listPPM:200, targetPPM:160, annualList:36000, net:28800, disc:20},
+        {type:'Member', qty:80, band:'1–100', listPPM:50, targetPPM:40, annualList:48000, net:38400, disc:20},
+        {type:'Guest', qty:0, band:'∞', listPPM:0, targetPPM:0, annualList:0, net:0, disc:0},
+      ],
+      addons:{}, connectors:{qty:3,list:15000,net:12000,disc:20},
+      services:[{active:true,list:46280,net:40000,disc:13.5}],
+      totalList:315280, totalNet:241600, disc:23.4,
+      approvals:{'highest':{status:'pending',email:'andrew.rsd@atlan.com'}},
+      submittedBy:'Alex Rivera', submittedAt:daysAgo(2), lastStatusChange:daysAgo(2),
+      sfdcOppId:'006Hs00000AA1111AAA', createdAt:daysAgo(5), hasRamp:false, rampYears:1, rampData:[],
+      renewalType:'auto', renewalDays:30, uplift:7, ambassador:true, optOut:false,
+      isAMAP:false, discReason:'Volume commitment', nonStdManual:[], customSkus:[],
+      quoteAcceptedAt:null, contracted:false, contractedAt:null,
+    },
+
+    // 2. NB · Standard · 10% disc · Self-Approved (≤15%)
+    {
+      dealId:'ATL-1002', dealType:'NB', quoteStatus:'Approved', status:'Approved',
+      legal:'Hashicorp Ltd.', billing:'101 Second St, San Francisco, CA 94105', contact:'Mike Patel',
+      email:'mike.patel@hashicorp.com', entity:'Atlan Inc.', currency:'USD',
+      startDate:startDate(7), termMonths:12, payTerms:'Net 30', billFreq:'Annual',
+      repName:'Jordan Kim', repEmail:'jordan.kim@atlan.com',
+      platformTier:'Standard', assets:2000000,
+      platformList:85000, platformNet:76500, platformDisc:10,
+      users:[
+        {type:'Admin', qty:8, band:'1–100', listPPM:200, targetPPM:160, annualList:19200, net:17280, disc:10},
+        {type:'Member', qty:25, band:'1–100', listPPM:50, targetPPM:40, annualList:15000, net:13500, disc:10},
+        {type:'Guest', qty:0, band:'∞', listPPM:0, targetPPM:0, annualList:0, net:0, disc:0},
+      ],
+      addons:{}, connectors:{qty:1,list:5000,net:4500,disc:10},
+      services:[{active:false,list:0,net:0,disc:0}],
+      totalList:124200, totalNet:111780, disc:10,
+      approvals:{},
+      submittedBy:'Jordan Kim', submittedAt:daysAgo(4), approvedBy:'Jordan Kim', approvedAt:daysAgo(4),
+      lastStatusChange:daysAgo(4), sfdcOppId:'006Hs00000BB2222BBB',
+      createdAt:daysAgo(7), hasRamp:false, rampYears:1, rampData:[],
+      renewalType:'auto', renewalDays:30, uplift:7, ambassador:true, optOut:false,
+      isAMAP:false, discReason:'', nonStdManual:[], customSkus:[],
+      quoteAcceptedAt:null, contracted:false, contractedAt:null,
+    },
+
+    // 3. NB · Biz-Critical · 38% disc · CRO Approval required
+    {
+      dealId:'ATL-1003', dealType:'NB', quoteStatus:'In Review', status:'In Review',
+      legal:'Palantir Technologies', billing:'1200 17th St, Denver, CO 80202', contact:'Emily Zhao',
+      email:'emily.zhao@palantir.com', entity:'Atlan Inc.', currency:'USD',
+      startDate:startDate(30), termMonths:24, payTerms:'Net 60', billFreq:'Annual',
+      repName:'Harsh Shah', repEmail:'harsh.shah@atlan.com',
+      platformTier:'Biz-critical', assets:50000000,
+      platformList:1250000, platformNet:775000, platformDisc:38,
+      users:[
+        {type:'Admin', qty:25, band:'1–100', listPPM:200, targetPPM:160, annualList:60000, net:37200, disc:38},
+        {type:'Member', qty:200, band:'101–500', listPPM:25, targetPPM:20, annualList:60000, net:37200, disc:38},
+        {type:'Guest', qty:0, band:'∞', listPPM:0, targetPPM:0, annualList:0, net:0, disc:0},
+      ],
+      addons:{}, connectors:{qty:5,list:25000,net:15500,disc:38},
+      services:[{active:true,list:279000,net:172980,disc:38}],
+      totalList:1674000, totalNet:1037880, disc:38,
+      approvals:{'highest':{status:'pending',email:'jim@atlan.com'}},
+      submittedBy:'Harsh Shah', submittedAt:daysAgo(1), reviewedBy:'Harsh Shah', reviewedAt:daysAgo(1),
+      lastStatusChange:daysAgo(1), sfdcOppId:'006Hs00000CC3333CCC',
+      createdAt:daysAgo(3), hasRamp:false, rampYears:2, rampData:[],
+      renewalType:'auto', renewalDays:60, uplift:5, ambassador:false, optOut:false,
+      isAMAP:false, discReason:'Strategic deal', nonStdManual:['rmv_renew'], customSkus:[],
+      quoteAcceptedAt:null, contracted:false, contractedAt:null,
+    },
+
+    // 4. NB · Enterprise · AMAP deal · 100% Y1 discount
+    {
+      dealId:'ATL-1004', dealType:'NB', quoteStatus:'Pending Approval', status:'Pending Approval',
+      legal:'Tata Consultancy Services', billing:'11 West 42nd St, New York, NY 10036', contact:'Ravi Menon',
+      email:'ravi.menon@tcs.com', entity:'Atlan Pte. Ltd.', currency:'USD',
+      startDate:startDate(20), termMonths:24, payTerms:'Net 30', billFreq:'Annual',
+      repName:'Priya Nair', repEmail:'priya.nair@atlan.com',
+      platformTier:'Enterprise', assets:10000000,
+      platformList:410000, platformNet:0, platformDisc:100,
+      users:[
+        {type:'Admin', qty:20, band:'1–100', listPPM:200, targetPPM:160, annualList:48000, net:0, disc:100},
+        {type:'Member', qty:100, band:'101–500', listPPM:25, targetPPM:20, annualList:30000, net:0, disc:100},
+        {type:'Guest', qty:0, band:'∞', listPPM:0, targetPPM:0, annualList:0, net:0, disc:0},
+      ],
+      addons:{}, connectors:{qty:2,list:10000,net:0,disc:100},
+      services:[{active:false,list:0,net:0,disc:0}],
+      totalList:498000, totalNet:0, disc:100,
+      approvals:{'highest':{status:'pending',email:'jim@atlan.com'}},
+      submittedBy:'Priya Nair', submittedAt:daysAgo(1), lastStatusChange:daysAgo(1),
+      sfdcOppId:'006Hs00000DD4444DDD',
+      createdAt:daysAgo(2), hasRamp:true, rampYears:2, rampData:[
+        {year:1,platformNet:0,users:[{net:0},{net:0},{net:0}],connectors:{net:0}},
+        {year:2,platformNet:320000,users:[{net:38000},{net:24000},{net:0}],connectors:{net:8000}},
+      ],
+      renewalType:'auto', renewalDays:30, uplift:7, ambassador:true, optOut:false,
+      isAMAP:true, discReason:'AMAP strategic land', nonStdManual:[], customSkus:[],
+      quoteAcceptedAt:null, contracted:false, contractedAt:null,
+    },
+
+    // 5. Upsell · Enterprise → Biz-Critical tier upgrade
+    {
+      dealId:'ATL-1005', dealType:'UP', quoteStatus:'Approved', status:'Approved',
+      legal:'Stripe Inc.', billing:'510 Townsend St, San Francisco, CA 94103', contact:'Daniel Wu',
+      email:'daniel.wu@stripe.com', entity:'Atlan Inc.', currency:'USD',
+      startDate:startDate(10), termMonths:9, payTerms:'Net 30', billFreq:'Annual',
+      repName:'Jordan Kim', repEmail:'jordan.kim@atlan.com',
+      platformTier:'Biz-critical', assets:10000000,
+      platformList:245000, platformNet:220500, platformDisc:10,
+      users:[
+        {type:'Admin', qty:10, band:'1–100', listPPM:200, targetPPM:160, annualList:24000, net:21600, disc:10},
+        {type:'Member', qty:50, band:'1–100', listPPM:50, targetPPM:40, annualList:30000, net:27000, disc:10},
+        {type:'Guest', qty:0, band:'∞', listPPM:0, targetPPM:0, annualList:0, net:0, disc:0},
+      ],
+      addons:{}, connectors:{qty:2,list:10000,net:9000,disc:10},
+      services:[{active:false,list:0,net:0,disc:0}],
+      totalList:309000, totalNet:278100, disc:10,
+      approvals:{}, nbPlatformNet:180000, upTierCredit:135000,
+      submittedBy:'Jordan Kim', submittedAt:daysAgo(3), approvedBy:'Jordan Kim', approvedAt:daysAgo(3),
+      lastStatusChange:daysAgo(3), sfdcOppId:'006Hs00000EE5555EEE',
+      createdAt:daysAgo(6), hasRamp:false, rampYears:1, rampData:[],
+      renewalType:'auto', renewalDays:30, uplift:7, ambassador:true, optOut:false,
+      isAMAP:false, discReason:'Tier upgrade co-term', nonStdManual:[], customSkus:[],
+      quoteAcceptedAt:null, contracted:false, contractedAt:null,
+    },
+
+    // 6. Renewal · Standard · 5% uplift applied · Accepted
+    {
+      dealId:'ATL-1006', dealType:'RN', quoteStatus:'Accepted', status:'Accepted',
+      legal:'GitHub Inc.', billing:'88 Colin P Kelly Jr St, San Francisco, CA 94107', contact:'Lisa Park',
+      email:'lisa.park@github.com', entity:'Atlan Inc.', currency:'USD',
+      startDate:startDate(5), termMonths:12, payTerms:'Net 30', billFreq:'Annual',
+      repName:'Alex Rivera', repEmail:'alex.rivera@atlan.com',
+      platformTier:'Standard', assets:5000000,
+      platformList:130000, platformNet:123500, platformDisc:5,
+      users:[
+        {type:'Admin', qty:12, band:'1–100', listPPM:200, targetPPM:160, annualList:28800, net:27360, disc:5},
+        {type:'Member', qty:60, band:'1–100', listPPM:50, targetPPM:40, annualList:36000, net:34200, disc:5},
+        {type:'Guest', qty:0, band:'∞', listPPM:0, targetPPM:0, annualList:0, net:0, disc:0},
+      ],
+      addons:{}, connectors:{qty:1,list:5000,net:4750,disc:5},
+      services:[{active:false,list:0,net:0,disc:0}],
+      totalList:199800, totalNet:189810, disc:5,
+      approvals:{},
+      submittedBy:'Alex Rivera', submittedAt:daysAgo(10),
+      approvedBy:'Alex Rivera', approvedAt:daysAgo(10),
+      acceptedBy:'Lisa Park', acceptedAt:daysAgo(7),
+      lastStatusChange:daysAgo(7), sfdcOppId:'006Hs00000FF6666FFF',
+      createdAt:daysAgo(14), hasRamp:false, rampYears:1, rampData:[],
+      renewalType:'auto', renewalDays:30, uplift:7, ambassador:true, optOut:false,
+      isAMAP:false, discReason:'Renewal uplift applied', nonStdManual:[], customSkus:[],
+      quoteAcceptedAt:daysAgo(7), contracted:false, contractedAt:null,
+    },
+
+    // 7. NB · Standard · Rejected (too high discount, 45%)
+    {
+      dealId:'ATL-1007', dealType:'NB', quoteStatus:'Rejected', status:'Rejected',
+      legal:'Notion Labs Inc.', billing:'2300 Harrison St, San Francisco, CA 94110', contact:'Tom Bradley',
+      email:'tom.bradley@notion.so', entity:'Atlan Inc.', currency:'USD',
+      startDate:startDate(0), termMonths:12, payTerms:'Net 30', billFreq:'Annual',
+      repName:'Harsh Shah', repEmail:'harsh.shah@atlan.com',
+      platformTier:'Standard', assets:1000000,
+      platformList:85000, platformNet:46750, platformDisc:45,
+      users:[
+        {type:'Admin', qty:5, band:'1–100', listPPM:200, targetPPM:160, annualList:12000, net:6600, disc:45},
+        {type:'Member', qty:20, band:'1–100', listPPM:50, targetPPM:40, annualList:12000, net:6600, disc:45},
+        {type:'Guest', qty:0, band:'∞', listPPM:0, targetPPM:0, annualList:0, net:0, disc:0},
+      ],
+      addons:{}, connectors:{qty:0,list:0,net:0,disc:0},
+      services:[{active:false,list:0,net:0,disc:0}],
+      totalList:109000, totalNet:59950, disc:45,
+      approvals:{'highest':{status:'rejected',email:'pk@atlan.com'}},
+      submittedBy:'Harsh Shah', submittedAt:daysAgo(8),
+      rejectedBy:'PK (CEO)', rejectedAt:daysAgo(6),
+      lastStatusChange:daysAgo(6), sfdcOppId:'006Hs00000GG7777GGG',
+      createdAt:daysAgo(10), hasRamp:false, rampYears:1, rampData:[],
+      renewalType:'auto', renewalDays:30, uplift:7, ambassador:true, optOut:false,
+      isAMAP:false, discReason:'Competitive pressure',
+      nonStdManual:[], customSkus:[],
+      quoteAcceptedAt:null, contracted:false, contractedAt:null,
+    },
+
+    // 8. NB · Enterprise · 3-year ramp · Draft
+    {
+      dealId:'ATL-1008', dealType:'NB', quoteStatus:'Draft', status:'Draft',
+      legal:'Databricks Inc.', billing:'160 Spear St, San Francisco, CA 94105', contact:'Ananya Gupta',
+      email:'ananya.gupta@databricks.com', entity:'Atlan Inc.', currency:'USD',
+      startDate:startDate(45), termMonths:36, payTerms:'Net 30', billFreq:'Annual',
+      repName:'Harsh Shah', repEmail:'harsh.shah@atlan.com',
+      platformTier:'Enterprise', assets:10000000,
+      platformList:410000, platformNet:369000, platformDisc:10,
+      users:[
+        {type:'Admin', qty:20, band:'1–100', listPPM:200, targetPPM:160, annualList:48000, net:43200, disc:10},
+        {type:'Member', qty:100, band:'101–500', listPPM:25, targetPPM:20, annualList:30000, net:27000, disc:10},
+        {type:'Guest', qty:0, band:'∞', listPPM:0, targetPPM:0, annualList:0, net:0, disc:0},
+      ],
+      addons:{}, connectors:{qty:4,list:20000,net:18000,disc:10},
+      services:[{active:true,list:99600,net:89640,disc:10}],
+      totalList:607600, totalNet:546840, disc:10,
+      approvals:{},
+      submittedBy:'Harsh Shah', submittedAt:null, lastStatusChange:null,
+      sfdcOppId:'006Hs00000HH8888HHH',
+      createdAt:daysAgo(1), hasRamp:true, rampYears:3, rampData:[
+        {year:1,platformNet:295200,users:[{net:34560},{net:21600},{net:0}],connectors:{net:14400}},
+        {year:2,platformNet:336000,users:[{net:39200},{net:24500},{net:0}],connectors:{net:16000}},
+        {year:3,platformNet:369000,users:[{net:43200},{net:27000},{net:0}],connectors:{net:18000}},
+      ],
+      renewalType:'auto', renewalDays:30, uplift:7, ambassador:true, optOut:false,
+      isAMAP:false, discReason:'Multi-year commitment', nonStdManual:[], customSkus:[],
+      quoteAcceptedAt:null, contracted:false, contractedAt:null,
+    },
+
+    // 9. Renewal · Enterprise · NST terms · Pending Approval
+    {
+      dealId:'ATL-1009', dealType:'RN', quoteStatus:'Pending Approval', status:'Pending Approval',
+      legal:'Airbnb Inc.', billing:'888 Brannan St, San Francisco, CA 94103', contact:'Chris Morgan',
+      email:'chris.morgan@airbnb.com', entity:'Atlan Inc.', currency:'USD',
+      startDate:startDate(12), termMonths:12, payTerms:'Net 45', billFreq:'Annual',
+      repName:'Alex Rivera', repEmail:'alex.rivera@atlan.com',
+      platformTier:'Enterprise', assets:5000000,
+      platformList:170000, platformNet:136000, platformDisc:20,
+      users:[
+        {type:'Admin', qty:18, band:'1–100', listPPM:200, targetPPM:160, annualList:43200, net:34560, disc:20},
+        {type:'Member', qty:90, band:'1–100', listPPM:50, targetPPM:40, annualList:54000, net:43200, disc:20},
+        {type:'Guest', qty:0, band:'∞', listPPM:0, targetPPM:0, annualList:0, net:0, disc:0},
+      ],
+      addons:{}, connectors:{qty:2,list:10000,net:8000,disc:20},
+      services:[{active:false,list:0,net:0,disc:0}],
+      totalList:277200, totalNet:221760, disc:20,
+      approvals:{'highest':{status:'pending',email:'andrew.rsd@atlan.com'}},
+      submittedBy:'Alex Rivera', submittedAt:daysAgo(1), lastStatusChange:daysAgo(1),
+      sfdcOppId:'006Hs00000II9999III',
+      createdAt:daysAgo(3), hasRamp:false, rampYears:1, rampData:[],
+      renewalType:'auto', renewalDays:60, uplift:7, ambassador:true, optOut:true, optOutDays:'30',
+      isAMAP:false, discReason:'Renewal retention discount',
+      nonStdManual:['rmv_uplift'], customSkus:[],
+      quoteAcceptedAt:null, contracted:false, contractedAt:null,
+    },
+
+    // 10. Upsell · Standard · Seat expansion · Self-Approved
+    {
+      dealId:'ATL-1010', dealType:'UP', quoteStatus:'Approved', status:'Approved',
+      legal:'Figma Inc.', billing:'760 Market St, San Francisco, CA 94102', contact:'Nina Torres',
+      email:'nina.torres@figma.com', entity:'Atlan Inc.', currency:'USD',
+      startDate:startDate(8), termMonths:6, payTerms:'Net 30', billFreq:'Annual',
+      repName:'Jordan Kim', repEmail:'jordan.kim@atlan.com',
+      platformTier:'Standard', assets:2000000,
+      platformList:85000, platformNet:76500, platformDisc:10,
+      users:[
+        {type:'Admin', qty:5, band:'1–100', listPPM:200, targetPPM:160, annualList:12000, net:10800, disc:10},
+        {type:'Member', qty:30, band:'1–100', listPPM:50, targetPPM:40, annualList:18000, net:16200, disc:10},
+        {type:'Guest', qty:0, band:'∞', listPPM:0, targetPPM:0, annualList:0, net:0, disc:0},
+      ],
+      addons:{}, connectors:{qty:1,list:5000,net:4500,disc:10},
+      services:[{active:false,list:0,net:0,disc:0}],
+      totalList:120000, totalNet:108000, disc:10,
+      approvals:{}, nbPlatformNet:72000, upTierCredit:36000,
+      submittedBy:'Jordan Kim', submittedAt:daysAgo(2), approvedBy:'Jordan Kim', approvedAt:daysAgo(2),
+      lastStatusChange:daysAgo(2), sfdcOppId:'006Hs00000JJ0000JJJ',
+      createdAt:daysAgo(4), hasRamp:false, rampYears:1, rampData:[],
+      renewalType:'auto', renewalDays:30, uplift:7, ambassador:true, optOut:false,
+      isAMAP:false, discReason:'Seat expansion co-term', nonStdManual:[], customSkus:[],
+      quoteAcceptedAt:null, contracted:false, contractedAt:null,
+    },
+  ];
+
+  // Merge: don't overwrite existing deals with same dealId
+  var existingIds = existing.map(function(d){ return d.dealId; });
+  var toAdd = seeds.filter(function(s){ return !existingIds.includes(s.dealId); });
+  var merged = toAdd.concat(existing);
+  saveDeals(merged);
+  localStorage.setItem(SEED_FLAG, '1');
+  deals = loadDeals();
+  renderDashboard();
+  if(currentView === 'quotes') renderQuotes();
+  alert('✅ ' + toAdd.length + ' test quotes loaded!\n\nScenarios covered:\n• 6 New Business · 2 Upsell · 2 Renewal\n• All 5 discount tiers (0–100%)\n• AMAP deal (TCS, 100% Y1)\n• CRO-level deal (Palantir, 38%)\n• Rejection (Notion, 45%)\n• 3-year ramp (Databricks)\n• Accepted quote (GitHub)\n• In Review (Palantir)\n• NST terms (Airbnb)');
+}
 
 </script>
 </body>

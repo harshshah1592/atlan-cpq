@@ -2264,7 +2264,19 @@ function showView(name){
       renderFieldMapping();
     }, 0);
   }
-  if(name==='quotes'){ renderQuotes(); }
+  if(name==='quotes'){
+    renderQuotes();
+    // Background sync from SFDC — merges remote quotes into localStorage silently
+    var tok2 = sfdcLoadToken ? sfdcLoadToken() : null;
+    if(tok2 && tok2.access_token) {
+      sfdcLoadQuotesList().then(function(sfdcDeals) {
+        if(sfdcDeals && sfdcDeals.length) {
+          deals = loadDeals();
+          renderQuotes(); // re-render with fresh data
+        }
+      }).catch(function(){});
+    }
+  }
   if(name==='sfdc-settings'){ sfdcPopulateCreds(); renderSfdcErrorLog(); }
 }
 
@@ -4783,6 +4795,7 @@ const SFDC_FIELD_MAP = {
     acceptedBy:      'Accepted_By__c',            // Text(100) — RevOps who accepted. CREATE THIS.
     acceptedAt:      'Accepted_At__c',            // DateTime. CREATE THIS.
     approverName:    'Approver_Name__c',          // Text(100) — name of required approver. CREATE THIS.
+    cpqJson:         'CPQ_Quote_JSON__c',         // Long Text Area(131072) — full quote state JSON. Created 2026-03-21.
   },
 
   // ── Opportunity fields (read on auto-fetch when Opp ID entered) ─
@@ -5436,6 +5449,113 @@ async function sfdcTestConnection() {
 // Fires when rep clicks Next on step 5 (Pricing Summary).
 // At this point we have complete pricing data so we write everything:
 // company/contact/billing, ARR, discount, line items, deal details.
+// ═══════════════════════════════════════════════════════════════════
+// SFDC-BACKED QUOTE STORAGE (Option A)
+// CPQ_Quote_JSON__c is the source of truth — localStorage is cache only
+// ═══════════════════════════════════════════════════════════════════
+
+// Write full quote state JSON to SFDC Quote record
+// Called from saveDeal() whenever a quote is saved
+async function sfdcWriteQuoteJSON(snap) {
+  if(!snap || !snap.dealId) return;
+  const tok = sfdcLoadToken ? sfdcLoadToken() : null;
+  if(!tok || !tok.access_token) return;
+
+  // Find the SFDC Quote ID — needed for PATCH
+  const quoteId = snap.sfdcQuoteId || state.sfdcQuoteId;
+  if(!quoteId) return; // Quote not yet pushed to SFDC — skip
+
+  try {
+    const jsonPayload = {};
+    jsonPayload[F('quote','cpqJson')] = JSON.stringify(snap);
+    await sfdcApiCall(
+      '/services/data/v59.0/sobjects/Quote/' + quoteId,
+      'PATCH', jsonPayload
+    );
+  } catch(e) {
+    // Silent — JSON write failure should never block the rep
+    sfdcLogError('CPQ JSON write failed: ' + (e.message||e));
+  }
+}
+
+// Read quote JSON from SFDC by CPQ_Quote_ID__c (external ID)
+// Called when opening a quote that isn't in localStorage
+async function sfdcReadQuoteJSON(cpqQuoteId) {
+  if(!cpqQuoteId) return null;
+  const tok = sfdcLoadToken ? sfdcLoadToken() : null;
+  if(!tok || !tok.access_token) return null;
+
+  try {
+    const soql = 'SELECT Id, ' + F('quote','cpqJson') + ' FROM Quote WHERE '
+      + F('quote','externalId') + '=\'' + cpqQuoteId + '\' LIMIT 1';
+    const res = await sfdcApiCall(
+      '/services/data/v59.0/query?q=' + encodeURIComponent(soql), 'GET'
+    );
+    if(!res || !res.records || !res.records.length) return null;
+    const rec = res.records[0];
+    const jsonStr = rec[F('quote','cpqJson')];
+    if(!jsonStr) return null;
+    const snap = JSON.parse(jsonStr);
+    // Save into localStorage so subsequent opens are instant
+    if(snap && snap.dealId) {
+      var localDeals = loadDeals();
+      var idx = localDeals.findIndex(function(d){ return d.dealId === snap.dealId; });
+      if(idx >= 0) localDeals[idx] = snap; else localDeals.unshift(snap);
+      saveDeals(localDeals);
+    }
+    return snap;
+  } catch(e) {
+    sfdcLogError('CPQ JSON read failed: ' + (e.message||e));
+    return null;
+  }
+}
+
+// Load all quotes for the current user's opportunities from SFDC
+// Used to populate the Quotes list view from SFDC when localStorage is empty/stale
+async function sfdcLoadQuotesList() {
+  const tok = sfdcLoadToken ? sfdcLoadToken() : null;
+  if(!tok || !tok.access_token) return [];
+
+  try {
+    // Fetch last 50 quotes with JSON blob — ordered by last modified
+    const soql = 'SELECT Id, Name, ' + F('quote','externalId') + ', '
+      + F('quote','cpqJson') + ', ' + F('quote','status') + ', '
+      + F('quote','version') + ', LastModifiedDate '
+      + 'FROM Quote WHERE ' + F('quote','cpqJson') + ' != null '
+      + 'ORDER BY LastModifiedDate DESC LIMIT 50';
+    const res = await sfdcApiCall(
+      '/services/data/v59.0/query?q=' + encodeURIComponent(soql), 'GET'
+    );
+    if(!res || !res.records || !res.records.length) return [];
+
+    var sfdcDeals = [];
+    res.records.forEach(function(rec) {
+      try {
+        var snap = JSON.parse(rec[F('quote','cpqJson')]);
+        if(snap && snap.dealId) {
+          snap.sfdcQuoteId = rec.Id; // ensure SFDC ID is always current
+          sfdcDeals.push(snap);
+        }
+      } catch(e) { /* skip malformed JSON */ }
+    });
+
+    // Merge SFDC deals into localStorage — SFDC wins on conflict
+    if(sfdcDeals.length) {
+      var localDeals = loadDeals();
+      sfdcDeals.forEach(function(sd) {
+        var idx = localDeals.findIndex(function(d){ return d.dealId === sd.dealId; });
+        if(idx >= 0) localDeals[idx] = sd; else localDeals.unshift(sd);
+      });
+      saveDeals(localDeals);
+      deals = localDeals;
+    }
+    return sfdcDeals;
+  } catch(e) {
+    sfdcLogError('SFDC quotes list load failed: ' + (e.message||e));
+    return [];
+  }
+}
+
 async function sfdcWriteDraftStepOne() {
   const tok = sfdcLoadToken ? sfdcLoadToken() : null;
   if(!tok || !tok.access_token) return;
@@ -5890,6 +6010,10 @@ function saveDeal(){
   const idx=deals.findIndex(d=>d.dealId===snap.dealId);
   if(idx>=0) deals[idx]=snap; else deals.unshift(snap);
   saveDeals(deals);
+  // ── Async SFDC JSON write — non-blocking, best-effort ──
+  if(snap.sfdcQuoteId) {
+    sfdcWriteQuoteJSON(snap).catch(function(){});
+  }
   return snap;
 }
 
@@ -6049,13 +6173,36 @@ function renderDashboard(){
 }
 function openDeal(dealId){
   const d=deals.find(x=>x.dealId===dealId);
-  if(!d) return;
-  try{
-    state=sanitizeDeal(JSON.parse(JSON.stringify(d)));
-    step=7; // go straight to OF view
-    renderCPQ();
-    showView('cpq');
-  }catch(e){ console.error('openDeal error:',e); }
+  if(d){
+    try{
+      state=sanitizeDeal(JSON.parse(JSON.stringify(d)));
+      step=7; // go straight to OF view
+      renderCPQ();
+      showView('cpq');
+    }catch(e){ console.error('openDeal error:',e); }
+    return;
+  }
+  // Not found locally — try fetching from SFDC
+  const tok = sfdcLoadToken ? sfdcLoadToken() : null;
+  if(tok && tok.access_token) {
+    showToast('Fetching quote from Salesforce…', '#1B5FC4', 5000);
+    sfdcReadQuoteJSON(dealId).then(function(snap) {
+      if(snap) {
+        deals = loadDeals(); // reload after sfdcReadQuoteJSON saved it
+        state = sanitizeDeal(JSON.parse(JSON.stringify(snap)));
+        step = 7;
+        renderCPQ();
+        showView('cpq');
+        showToast('Quote loaded from Salesforce ✓', '#00B87A');
+      } else {
+        showToast('Quote not found in Salesforce — may have been deleted', '#D63B3B', 5000);
+      }
+    }).catch(function(e) {
+      showToast('Error loading quote: ' + (e.message||e), '#D63B3B', 5000);
+    });
+  } else {
+    showToast('Quote not found. Connect to Salesforce to load from SFDC.', '#D63B3B', 5000);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -8252,16 +8399,48 @@ function checkUrlParams() {
     var storedSearch = sessionStorage.getItem('cpq_redirect_params');
     if(storedSearch) {
       sessionStorage.removeItem('cpq_redirect_params');
-      // Re-parse from stored search string
       var stored = new URLSearchParams(storedSearch);
       var storedOppId = stored.get('oppId') || stored.get('opp_id');
-      if(storedOppId && !new URLSearchParams(window.location.search).get('oppId')) {
-        // Inject into current URL context and re-run
+      var storedQuoteId = stored.get('quoteId');
+      if((storedOppId || storedQuoteId) && !new URLSearchParams(window.location.search).get('oppId') && !new URLSearchParams(window.location.search).get('quoteId')) {
         window.history.replaceState({}, '', window.location.pathname + storedSearch);
       }
     }
 
     var params = new URLSearchParams(window.location.search);
+
+    // ── Handle ?quoteId= — direct link from SFDC Quote object ──────
+    var cpqQuoteId = params.get('quoteId');
+    if(cpqQuoteId) {
+      window.history.replaceState({}, '', window.location.pathname);
+      var targetDeal = deals.find(function(d){ return d.dealId === cpqQuoteId; });
+      if(targetDeal) {
+        setTimeout(function(){
+          openDeal(targetDeal.dealId);
+          showToast('Opened quote: ' + (targetDeal.quoteName || cpqQuoteId), '#00B87A');
+        }, 400);
+      } else {
+        // Not in localStorage — fetch from SFDC (works cross-browser)
+        setTimeout(function(){
+          showToast('Loading quote from Salesforce…', '#1B5FC4', 5000);
+          sfdcReadQuoteJSON(cpqQuoteId).then(function(snap) {
+            if(snap) {
+              deals = loadDeals();
+              openDeal(snap.dealId);
+              showToast('Quote loaded from Salesforce ✓', '#00B87A');
+            } else {
+              showView('quotes');
+              showToast('Quote not found — it may have been created on a different account', '#D63B3B', 6000);
+            }
+          }).catch(function(){
+            showView('quotes');
+            showToast('Connect to Salesforce to load this quote', '#D63B3B', 5000);
+          });
+        }, 600);
+      }
+      return;
+    }
+
     var oppId = params.get('oppId') || params.get('opp_id');
     var dealTypeParam = (params.get('dealType') || params.get('deal_type') || 'NB').toUpperCase();
     if(!oppId) return;
